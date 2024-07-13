@@ -266,14 +266,9 @@ SGTSOBF_wwwwwWwWw={"\108","\111","\97","\100","\115","\116","\114","\105","\110"
   	end    
 })
 
----Label---
-
 Tab7:AddLabel("Creator: minh152680")
-
 q:AddLabel("Hello human")
-
 q:AddLabel("Thanks for using my script")
-
 q:AddLabel("enjoy")
 
 OrionLib:Init()
