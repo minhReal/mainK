@@ -1,5 +1,5 @@
 // t kinh ngạc vì m vào đc trong đây nhưng m vô trong đây thì chẳng làm được moe gì đâu
-(async (MODE) => {
+async function chonVaNopCauHoiScript(MODE) {
   console.log(`# Theo như t thấy là m đã chọn ${MODE.toUpperCase()}`);
 
   function simulateClick(el) {
@@ -46,6 +46,7 @@
       const submitBtn = document.querySelector("#ws-problem-container .submit-attempt-container > button");
       if(!submitBtn) return console.log("🔴 Không tìm thấy nút submit.");
       simulateClick(submitBtn);
+      console.log("📤 Đã bấm nút nộp");
 
       await new Promise(r=>setTimeout(r,1200));
 
@@ -65,6 +66,7 @@
       }
     }
 
+    console.log("🏁 Hết lựa chọn, không tìm được đáp án đúng");
   }
 
   async function clickNextButton(){
@@ -74,10 +76,10 @@
       nextBtn.scrollIntoView({behavior:"smooth",block:"center"});
       await new Promise(r=>setTimeout(r,500));
       simulateClick(nextBtn);
-      console.log("🟢 Đang chuyển qua bài khác");
+      console.log("🟢 Đã bấm NEXT, **dừng code hẳn**");
     } else console.log("🔴 Không tìm thấy nút NEXT.");
   }
 
   // Bắt đầu
   chonVaNopCauHoi();
-})();
+}
