@@ -9,7 +9,7 @@
   `;
   dragItem.innerHTML = `
     <header style="cursor:grab; display:flex; justify-content:space-between; align-items:center; background:#34495e; padding:5px; border-radius:8px; font-weight:bold;">
-      <span></span>
+      <span>Đá quả lọ đê</span>
       <button id="closeBtn" style="background:red;border:none;color:white;width:25px;height:25px;border-radius:4px;cursor:pointer;">×</button>
     </header>
     <button id="runBtn" style="width:100%;margin-top:10px;padding:10px;border:none;border-radius:5px;background:#1abc9c;color:white;font-size:16px;cursor:pointer;">Click 4 full điểm</button>
