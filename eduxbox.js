@@ -1,3 +1,4 @@
+// t kinh ngạc vì m vào đc trong đây nhưng m vô trong đây thì chẳng làm được moe gì đâu
 (async () => {
   const MODE = window._deviceMode || "pc";
   console.log(`# Theo như t thấy là m đã chọn ${MODE.toUpperCase()}`);
