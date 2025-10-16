@@ -1,7 +1,6 @@
 // t kinh ngạc vì m vào đc trong đây nhưng m vô trong đây thì chẳng làm được moe gì đâu
 (async () => {
   const MODE = window._deviceMode
-  console.log(`# Theo như t thấy là m đã chọn ${MODE.toUpperCase()}`);
 
   function simulateClick(el) {
     if (!el) return;
@@ -9,20 +8,16 @@
     const x = rect.left + rect.width / 2;
     const y = rect.top + rect.height / 2;
     const evts =
-      MODE === "mob"
-        ? ["touchstart", "touchend", "click"]
-        : ["mousedown", "mouseup", "click"];
-
+      MODE === "mob" ? ["touchstart", "touchend", "click"] : ["mousedown", "mouseup", "click"];
     for (const evt of evts) {
       try {
-        const e =
-          evt.startsWith("touch")
-            ? new TouchEvent(evt, {
-                bubbles: true,
-                cancelable: true,
-                touches: [new Touch({ identifier: Date.now(), target: el, clientX: x, clientY: y })],
-              })
-            : new MouseEvent(evt, { bubbles: true, cancelable: true, clientX: x, clientY: y });
+        const e = evt.startsWith("touch")
+          ? new TouchEvent(evt, {
+              bubbles: true,
+              cancelable: true,
+              touches: [new Touch({ identifier: Date.now(), target: el, clientX: x, clientY: y })],
+            })
+          : new MouseEvent(evt, { bubbles: true, cancelable: true, clientX: x, clientY: y });
         el.dispatchEvent(e);
       } catch {
         el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
@@ -30,8 +25,11 @@
     }
   }
 
+  let index = Number(localStorage.getItem("_chonVaNop_index") || 0);
+
   async function chonVaNopCauHoi() {
-    console.log("🟢 Checking..");
+    console.log("🟢 Ok để t check");
+
     const container = Array.from(document.querySelectorAll('[id^="inputtype_"]')).find(el =>
       el.id.includes("_2_1")
     );
@@ -47,18 +45,19 @@
     }
 
     const options = Array.from(fieldset.querySelectorAll('input[type="radio"], input[type="checkbox"]'));
-    if (options.length === 0) return console.log("🔴 Không có lựa chọn.");
+    if (options.length === 0) return console.log("🔴 Không có lựa chọn nào");
 
-    if (!window._chonVaNop_index) window._chonVaNop_index = 0;
-    const i = window._chonVaNop_index % options.length;
+    console.log(`🟡 Tất cả câu trắc nghiệm t thấy: ${options.length}`);
+    const i = index % options.length;
     const option = options[i];
-    window._chonVaNop_index++;
+    index++;
+    localStorage.setItem("_chonVaNop_index", index);
 
     simulateClick(option);
     console.log(`🟡 Đang chọn đáp án thứ ${i + 1}`);
 
     const submitBtn = document.querySelector("#ws-problem-container .submit-attempt-container > button");
-    if (!submitBtn) return console.log("🔴 Không tìm thấy nút Nộp.");
+    if (!submitBtn) return console.log("🔴 Không tìm thấy nút submit.");
     simulateClick(submitBtn);
 
     await new Promise(r => setTimeout(r, 1200));
@@ -66,14 +65,14 @@
     const popupBtn = document.querySelector("body .ui-dialog-buttonpane button");
     if (popupBtn) {
       simulateClick(popupBtn);
-      console.log("🟡 Đang gửi...");
+      console.log("🟡 Đang gửi");
     }
 
     await new Promise(r => setTimeout(r, 1500));
 
     const correctNow = container.querySelector("span.status.correct");
     if (correctNow) {
-      console.log("🟢 Đã tìm đc đáp án đúng");
+      console.log("🟢 Ok đã thấy đáp án");
       await clickNextButton();
       return;
     }
@@ -82,7 +81,6 @@
     if (submitBtnMoi) {
       await chonVaNopCauHoi();
     } else {
-      console.log("🏁 Hết câu hỏi.");
     }
   }
 
@@ -95,13 +93,12 @@
       nextBtn.scrollIntoView({ behavior: "smooth", block: "center" });
       await new Promise(r => setTimeout(r, 500));
       simulateClick(nextBtn);
-      console.log("🟢 Ok rồi, giờ chuyển qua trang mới");
-      await new Promise(r => setTimeout(r, 2000));
-      await chonVaNopCauHoi();
-    } else {
+      console.log("🟢 Ok rồi, bấm NEXT xong, **dừng code**.");
+      } else {
       console.log("🔴 Không tìm thấy nút NEXT.");
     }
   }
 
+  // Bắt đầu
   chonVaNopCauHoi();
 })();
