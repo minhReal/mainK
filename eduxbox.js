@@ -1,6 +1,6 @@
 // t kinh ngạc vì m vào đc trong đây nhưng m vô trong đây thì chẳng làm được moe gì đâu
-// 🔧 Chỉnh 1 dòng duy nhất: "true" hoặc "false" để bật/tắt loop
-const LOOP_AFTER_NEXT = true;
+const LOOP_AFTER_NEXT = true; // Chỉnh "true" hoặc "false" để bật/tắt loop
+
 
 (async () => {
   console.log(`# Chạy chế độ PC`);
