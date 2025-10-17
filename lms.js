@@ -1,8 +1,9 @@
 // m làm j ở đây? //
+
 (() => {
   if (document.getElementById("draggableUI")) return;
 
-  // ==== GUI ====
+  // tạo gui
   const dragItem = document.createElement('div');
   dragItem.id = 'draggableUI';
   dragItem.style.cssText = `
@@ -10,12 +11,11 @@
     background: #2c3e50; color: white; border-radius: 10px;
     z-index: 999999; user-select: none; touch-action: none;
     box-shadow: 0 4px 10px rgba(0,0,0,0.3); font-family: sans-serif;
-    overflow: hidden;
   `;
   dragItem.innerHTML = `
     <header id="dragHeader" style="cursor:grab; display:flex; justify-content:space-between; align-items:center; background:#34495e; padding:6px 10px; border-radius:10px 10px 0 0;">
       <span style="text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000;">
-        By minh <span style="font-size:11px; color:#ccc; opacity:0.6;">(-m sẽ bt t là ai-)</span>
+        By minh <span style="font-size:11px; color:#ccc; opacity:0.6;">(🫵🎃)</span>
       </span>
       <button id="closeBtn" style="background:red;border:none;color:white;width:25px;height:25px;border-radius:5px;cursor:pointer;font-size:16px;">×</button>
     </header>
@@ -26,7 +26,7 @@
   `;
   document.body.appendChild(dragItem);
 
-  // ==== Nút style ====
+  // nút style 
   const btns = dragItem.querySelectorAll(".customBtn");
   btns.forEach(btn => {
     btn.style.cssText = `
@@ -41,26 +41,35 @@
       font-weight: bold;
       text-shadow: -1px -1px 0 #000, 1px -1px 0 #000,
                    -1px 1px 0 #000, 1px 1px 0 #000;
-      transition: transform 0.15s ease, filter 0.15s ease, background 0.2s;
+      transition: transform 0.12s ease, filter 0.12s ease;
     `;
 
-    // Hover & touch zoom effect
-    const enlarge = () => {
-      btn.style.transform = "scale(1.08)";
-      btn.style.filter = "brightness(1.2)";
+    // hover/touch/drag phóng to/nhỏ
+    const zoomIn = () => {
+      btn.style.transform = "scale(1.05)";
+      btn.style.filter = "brightness(1.1)";
     };
-    const shrink = () => {
+    const zoomOut = () => {
       btn.style.transform = "scale(1)";
       btn.style.filter = "brightness(1)";
     };
 
-    btn.addEventListener("mouseenter", enlarge);
-    btn.addEventListener("mouseleave", shrink);
-    btn.addEventListener("touchstart", enlarge, { passive: true });
-    btn.addEventListener("touchend", shrink);
+    // desktop hover
+    btn.addEventListener("mouseenter", zoomIn);
+    btn.addEventListener("mouseleave", zoomOut);
+
+    // mobile touch
+    btn.addEventListener("touchstart", zoomIn, { passive: true });
+    btn.addEventListener("touchend", zoomOut);
+    btn.addEventListener("touchcancel", zoomOut);
+
+    // drag (giữ và di tay/mouse) vẫn giữ phóng to
+    btn.addEventListener("mousedown", zoomIn);
+    btn.addEventListener("mouseup", zoomOut);
+    btn.addEventListener("mouseleave", zoomOut);
   });
 
-  // ==== Drag system ====
+  // drag system
   const header = document.getElementById('dragHeader');
   const closeBtn = document.getElementById('closeBtn');
   let active = false, currentX = 0, currentY = 0, initialX = 0, initialY = 0, xOffset = 0, yOffset = 0;
@@ -93,10 +102,10 @@
   document.addEventListener('touchmove', dragMove, { passive: true });
   document.addEventListener('touchend', dragEnd);
 
-  // ==== Close ====
+  // nút close
   closeBtn.onclick = () => dragItem.remove();
 
-  // ==== Auto Click đúng ====
+  // tìm câu trả lời đúng system 
   document.getElementById('runBtn').onclick = async () => {
     try {
       const iframe = document.querySelector('iframe');
@@ -120,14 +129,14 @@
         }
       });
 
-      if (found) console.log("✅ Đã chọn đáp án đúng!");
+      if (found) console.log("");
       else console.warn("⚠️ Không tìm thấy đáp án đúng!");
     } catch (err) {
       console.error('Lỗi:', err);
     }
   };
 
-  // ==== Highlight toggle ====
+  // highlight toggle
   let highlightActive = false;
   const highlightBtn = document.getElementById('highlightBtn');
   highlightBtn.onclick = () => {
