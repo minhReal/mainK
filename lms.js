@@ -10,10 +10,13 @@
     background: #2c3e50; color: white; border-radius: 10px;
     z-index: 999999; user-select: none; touch-action: none;
     box-shadow: 0 4px 10px rgba(0,0,0,0.3); font-family: sans-serif;
+    overflow: hidden;
   `;
   dragItem.innerHTML = `
     <header id="dragHeader" style="cursor:grab; display:flex; justify-content:space-between; align-items:center; background:#34495e; padding:6px 10px; border-radius:10px 10px 0 0;">
-      <span style="text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000;">By minh(m ko đoán đc đâu)</span>
+      <span style="text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000;">
+        By minh <span style="font-size:11px; color:#ccc; opacity:0.6;">(-m sẽ bt t là ai-)</span>
+      </span>
       <button id="closeBtn" style="background:red;border:none;color:white;width:25px;height:25px;border-radius:5px;cursor:pointer;font-size:16px;">×</button>
     </header>
     <div style="padding:10px; display:flex; flex-direction:column; gap:8px;">
@@ -38,12 +41,23 @@
       font-weight: bold;
       text-shadow: -1px -1px 0 #000, 1px -1px 0 #000,
                    -1px 1px 0 #000, 1px 1px 0 #000;
-      transition: 0.2s;
+      transition: transform 0.15s ease, filter 0.15s ease, background 0.2s;
     `;
-    btn.onmouseenter = () => btn.style.background = "#16a085";
-    btn.onmouseleave = () => {
-      if (!btn.dataset.active) btn.style.background = "#1abc9c";
+
+    // Hover & touch zoom effect
+    const enlarge = () => {
+      btn.style.transform = "scale(1.08)";
+      btn.style.filter = "brightness(1.2)";
     };
+    const shrink = () => {
+      btn.style.transform = "scale(1)";
+      btn.style.filter = "brightness(1)";
+    };
+
+    btn.addEventListener("mouseenter", enlarge);
+    btn.addEventListener("mouseleave", shrink);
+    btn.addEventListener("touchstart", enlarge, { passive: true });
+    btn.addEventListener("touchend", shrink);
   });
 
   // ==== Drag system ====
