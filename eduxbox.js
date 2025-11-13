@@ -1,10 +1,10 @@
-// t kinh ngạc vì m vào đc trong đây nhưng m vô trong đây thì chẳng làm được moe gì đâu
-const LOOP_AFTER_NEXT = true; // Chỉnh "true" hoặc "false" để bật/tắt loop
-
+// Script tá»± Ä‘á»™ng chá»n Ä‘Ă¡p Ă¡n vĂ  submit trĂªn PC
+const LOOP_AFTER_NEXT = true; // true = tá»± Ä‘á»™ng loop
 
 (async () => {
-  console.log(`# Chạy chế độ PC`);
+  console.log(`# Cháº¡y cháº¿ Ä‘á»™ PC`);
 
+  // HĂ m giáº£ láº­p click chuáº©n
   function simulateClick(el) {
     if (!el) return;
     const rect = el.getBoundingClientRect();
@@ -19,60 +19,26 @@ const LOOP_AFTER_NEXT = true; // Chỉnh "true" hoặc "false" để bật/tắt
     }
   }
 
+  // Láº¥y index hiá»‡n táº¡i tá»« localStorage
   let index = Number(localStorage.getItem("_chonVaNop_index") || 0);
 
-  async function chonVaNopCauHoi() {
-    const container = Array.from(document.querySelectorAll('[id^="inputtype_"]')).find(el =>
-      el.id.includes("_2_1")
-    );
-    if (!container) return console.log("🔴 Không tìm thấy container câu hỏi.");
+  // HĂ m xá»­ lĂ½ popup náº¿u cĂ³
+  async function handlePopup() {
+    const popupButtons = document.querySelectorAll("body .ui-dialog-buttonpane button");
+    if (!popupButtons || popupButtons.length === 0) return;
 
-    const fieldset = container.querySelector("fieldset");
-    if (!fieldset) return console.log("🔴 Không tìm thấy fieldset.");
-
-    const correctSpan = container.querySelector("span.status.correct");
-    if (correctSpan) {
-      await clickNextButton();
-      return;
-    }
-
-    const options = Array.from(fieldset.querySelectorAll('input[type="radio"], input[type="checkbox"]'));
-    if (options.length === 0) return console.log("🔴 Không có lựa chọn nào");
-
-    const i = index % options.length;
-    simulateClick(options[i]);
-    console.log(`🟡 Chọn đáp án thứ ${i + 1}`);
-    index++;
-    localStorage.setItem("_chonVaNop_index", index);
-
-    const submitBtn = document.querySelector("#ws-problem-container .submit-attempt-container > button");
-    if (!submitBtn) return console.log("🔴 Không tìm thấy nút submit.");
-    simulateClick(submitBtn);
-
-    await new Promise(r => setTimeout(r, 1200));
-
-    const popupBtn = document.querySelector("body .ui-dialog-buttonpane button");
-    if (popupBtn) {
-      simulateClick(popupBtn);
-      console.log("🟡 Đang gửi popup nếu có");
-    }
-
-    await new Promise(r => setTimeout(r, 1500));
-
-    const correctNow = container.querySelector("span.status.correct");
-    if (correctNow) {
-      console.log("🟢 Đáp án đúng đã hiển thị");
-      await clickNextButton();
-      return;
-    }
-
-    const submitBtnMoi = document.querySelector("#ws-problem-container .submit-attempt-container > button");
-    if (submitBtnMoi) {
-      await chonVaNopCauHoi();
-    } else {
+    for (const btn of popupButtons) {
+      if (btn.offsetParent !== null) { // chá»‰ click náº¿u button hiá»ƒn thá»‹
+        btn.scrollIntoView({ behavior: "smooth", block: "center" });
+        await new Promise(r => setTimeout(r, 300));
+        simulateClick(btn);
+        console.log("đŸŸ¡ Äang gá»­i popup náº¿u cĂ³");
+        await new Promise(r => setTimeout(r, 500));
+      }
     }
   }
 
+  // HĂ m click NEXT
   async function clickNextButton() {
     const nextBtnSpan = Array.from(document.querySelectorAll("span.sequence-nav-button-label")).find(
       el => el.textContent.trim().toUpperCase() === "NEXT"
@@ -82,18 +48,70 @@ const LOOP_AFTER_NEXT = true; // Chỉnh "true" hoặc "false" để bật/tắt
       nextBtn.scrollIntoView({ behavior: "smooth", block: "center" });
       await new Promise(r => setTimeout(r, 500));
       simulateClick(nextBtn);
-      console.log("🟢 Chuyển qua bài khác");
+      console.log("đŸŸ¢ Chuyá»ƒn qua bĂ i khĂ¡c");
 
       if (LOOP_AFTER_NEXT) {
-        // Nếu bật loop, gọi lại function để tiếp tục làm bài
         await new Promise(r => setTimeout(r, 1000));
         chonVaNopCauHoi();
       }
     } else {
-      console.log("🔴 Không tìm thấy nút NEXT.");
+      console.log("đŸ”´ KhĂ´ng tĂ¬m tháº¥y nĂºt NEXT.");
     }
   }
 
-  // Bắt đầu
+  // HĂ m chá»n vĂ  ná»™p cĂ¢u há»i
+  async function chonVaNopCauHoi() {
+    const container = Array.from(document.querySelectorAll('[id^="inputtype_"]')).find(el =>
+      el.id.includes("_2_1")
+    );
+    if (!container) return console.log("đŸ”´ KhĂ´ng tĂ¬m tháº¥y container cĂ¢u há»i.");
+
+    const fieldset = container.querySelector("fieldset");
+    if (!fieldset) return console.log("đŸ”´ KhĂ´ng tĂ¬m tháº¥y fieldset.");
+
+    const correctSpan = container.querySelector("span.status.correct");
+    if (correctSpan) {
+      await clickNextButton();
+      return;
+    }
+
+    const options = Array.from(fieldset.querySelectorAll('input[type="radio"], input[type="checkbox"]'));
+    if (options.length === 0) return console.log("đŸ”´ KhĂ´ng cĂ³ lá»±a chá»n nĂ o");
+
+    const i = index % options.length;
+    simulateClick(options[i]);
+    console.log(`đŸŸ¡ Chá»n Ä‘Ă¡p Ă¡n thá»© ${i + 1}`);
+    index++;
+    localStorage.setItem("_chonVaNop_index", index);
+
+    // Submit cĂ¢u tráº£ lá»i
+    const submitBtn = document.querySelector("#ws-problem-container .submit-attempt-container > button");
+    if (!submitBtn) return console.log("đŸ”´ KhĂ´ng tĂ¬m tháº¥y nĂºt submit.");
+    simulateClick(submitBtn);
+
+    await new Promise(r => setTimeout(r, 1200));
+
+    // Xá»­ lĂ½ popup náº¿u cĂ³
+    await handlePopup();
+
+    await new Promise(r => setTimeout(r, 1500));
+
+    // Kiá»ƒm tra Ä‘Ă¡p Ă¡n Ä‘Ăºng
+    const correctNow = container.querySelector("span.status.correct");
+    if (correctNow) {
+      console.log("đŸŸ¢ ÄĂ¡p Ă¡n Ä‘Ăºng Ä‘Ă£ hiá»ƒn thá»‹");
+      await clickNextButton();
+      return;
+    }
+
+    // Náº¿u váº«n chÆ°a cĂ³ nĂºt submit má»›i, gá»i láº¡i
+    const submitBtnMoi = document.querySelector("#ws-problem-container .submit-attempt-container > button");
+    if (submitBtnMoi) {
+      await chonVaNopCauHoi();
+    }
+  }
+
+  // Báº¯t Ä‘áº§u cháº¡y
   chonVaNopCauHoi();
+
 })();
