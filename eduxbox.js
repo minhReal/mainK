@@ -1,8 +1,8 @@
 // by minh
 (async () => {
-    console.log("Chạy chế độ PC");
+    console.log("Script tự động đang chạy...");
 
-    // ----- Hàm lấy thông tin máy tính -----
+    // Lấy thông tin máy tính
     function getDeviceInfo() {
         const ua = navigator.userAgent;
         let deviceType = "PC";
@@ -14,23 +14,24 @@
         return deviceType;
     }
 
-    // ----- Hàm gửi tin nhắn lên Discord (Replit Server) -----
+    // Gửi thông tin lên Discord
     async function notifyDiscord(msg) {
         try {
-            await fetch("https://YOUR-REPLIT-URL.repl.co/send", { // Thay YOUR-REPLIT-URL
+            await fetch("https://replit.com/@duongminhminh46/script-bot", { // Thay YOUR-REPLIT-URL
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ message: msg })
             });
         } catch (err) {
-            console.error("Không thể gửi tin nhắn Discord:", err);
+            console.error("Không gửi được Discord:", err);
         }
     }
 
-    // Gửi thông báo khi script được kích hoạt
     const device = getDeviceInfo();
     notifyDiscord(`Máy tính (${device}) đã dùng script tự động.`);
 
+    console.log("Thông tin đã gửi lên Discord.");
+})();
     // ----- Script gốc tự động chọn và nộp -----
     const LOOP_AFTER_NEXT = true;
 
