@@ -2,7 +2,7 @@
 const LOOP_AFTER_NEXT = true; // true = tự động loop
 
 (async () => {
-  console.log(`# Chạy chế độ PC`);
+  console.log(`# By minh`);
 
   function simulateClick(el) {
     if (!el) return;
