@@ -1,5 +1,5 @@
 console.log(
-    "%Code bij looix khoong dufng duocdwj🗣️🔥",
+    "%KOODIVIGA EI SAA KASUTADA😢😢",
     `
     font-size: 40px;
     font-weight: 900;
