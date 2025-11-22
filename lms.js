@@ -1,5 +1,5 @@
 console.log(
-    "%KOODIVIGA EI SAA KASUTADA😢😢",
+    "%c😢KOODIVIGA EI SAA KASUTADA😢",
     `
     font-size: 40px;
     font-weight: 900;
@@ -7,4 +7,3 @@ console.log(
     text-shadow: 2px 2px 0 black;
     `
 );
-
