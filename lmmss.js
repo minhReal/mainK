@@ -3,7 +3,6 @@
 (() => {
   if (document.getElementById("draggableUI")) return;
 
-  // tạo gui
   const dragItem = document.createElement('div');
   dragItem.id = 'draggableUI';
   dragItem.style.cssText = `
@@ -15,7 +14,7 @@
   dragItem.innerHTML = `
     <header id="dragHeader" style="cursor:grab; display:flex; justify-content:space-between; align-items:center; background:#34495e; padding:6px 10px; border-radius:10px 10px 0 0;">
       <span style="text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000;">
-        By minh <span style="font-size:11px; color:#ccc; opacity:0.6;">(🫵🎃)</span>
+        By minh <span style="font-size:11px; color:#ccc; opacity:0.6;">(làm chậm thôi)</span>
       </span>
       <button id="closeBtn" style="background:red;border:none;color:white;width:25px;height:25px;border-radius:5px;cursor:pointer;font-size:16px;">×</button>
     </header>
@@ -26,7 +25,6 @@
   `;
   document.body.appendChild(dragItem);
 
-  // nút style 
   const btns = dragItem.querySelectorAll(".customBtn");
   btns.forEach(btn => {
     btn.style.cssText = `
@@ -44,7 +42,6 @@
       transition: transform 0.12s ease, filter 0.12s ease;
     `;
 
-    // hover/touch/drag phóng to/nhỏ
     const zoomIn = () => {
       btn.style.transform = "scale(1.05)";
       btn.style.filter = "brightness(1.1)";
@@ -54,22 +51,18 @@
       btn.style.filter = "brightness(1)";
     };
 
-    // desktop hover
     btn.addEventListener("mouseenter", zoomIn);
     btn.addEventListener("mouseleave", zoomOut);
 
-    // mobile touch
     btn.addEventListener("touchstart", zoomIn, { passive: true });
     btn.addEventListener("touchend", zoomOut);
     btn.addEventListener("touchcancel", zoomOut);
 
-    // drag (giữ và di tay/mouse) vẫn giữ phóng to
     btn.addEventListener("mousedown", zoomIn);
     btn.addEventListener("mouseup", zoomOut);
     btn.addEventListener("mouseleave", zoomOut);
   });
 
-  // drag system
   const header = document.getElementById('dragHeader');
   const closeBtn = document.getElementById('closeBtn');
   let active = false, currentX = 0, currentY = 0, initialX = 0, initialY = 0, xOffset = 0, yOffset = 0;
@@ -102,10 +95,8 @@
   document.addEventListener('touchmove', dragMove, { passive: true });
   document.addEventListener('touchend', dragEnd);
 
-  // nút close
   closeBtn.onclick = () => dragItem.remove();
 
-  // tìm câu trả lời đúng system 
   document.getElementById('runBtn').onclick = async () => {
     try {
       const iframe = document.querySelector('iframe');
@@ -136,7 +127,6 @@
     }
   };
 
-  // highlight toggle
   let highlightActive = false;
   const highlightBtn = document.getElementById('highlightBtn');
   highlightBtn.onclick = () => {
