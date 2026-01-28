@@ -83,11 +83,11 @@
             - <b>Tab Auto:</b> Các chức năng giúp mày biết đáp án.<br>
             - <b>Tab Search:</b> Tìm kiếm những câu hỏi khó hoặc "Auto" ko thể giúp mày ( do chưa biết làm A.I nên làm tab này chức:() ).
         </p>
-        <div style="font-size: 11px; color: #888; text-align: right; margin-top: 10px;">29/1/2026- By minhh</div>
+        <div style="font-size: 11px; color: #888; text-align: right; margin-top: 10px;">29/1/2026 - By minhh</div>
     </div>
 
     <div id="tabAuto" class="tab-content">
-      <button id="runBtn" class="customBtn">Auto full điểm</button>
+      <button id="runBtn" class="customBtn">Chọn tất cả đáp án</button>
       <button id="highlightBtn" class="customBtn">Highlight đáp án</button>
     </div>
 
