@@ -1,10 +1,8 @@
 // ờ, skibidi //
 
 (() => {
-  // Chặn tạo trùng
   if (document.getElementById("draggableUI")) return;
 
-  // 1. TẠO GIAO DIỆN CHÍNH
   const dragItem = document.createElement('div');
   dragItem.id = 'draggableUI';
   dragItem.style.cssText = `
@@ -23,7 +21,6 @@
     overflow: hidden;
   `;
 
-  // CSS cho Tabs và Nội dung
   const style = document.createElement('style');
   style.innerHTML = `
     .tab-bar { display: flex; background: #f0f0f0; border-bottom: 1px solid #ddd; }
@@ -53,7 +50,6 @@
   `;
   document.head.appendChild(style);
 
-  // HTML Nội dung
   dragItem.innerHTML = `
     <header id="dragHeader" style="
       cursor: grab;
@@ -104,19 +100,14 @@
 
   document.body.appendChild(dragItem);
 
-  // 2. XỬ LÝ CHUYỂN TAB
   window.switchTab = (tabId, btn) => {
-    // Ẩn hết content
     dragItem.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-    // Bỏ active button cũ
     dragItem.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
     
-    // Hiện cái mới
     document.getElementById(tabId).classList.add('active');
     btn.classList.add('active');
   };
 
-  // 3. CSS CHO NÚT BẤM (GIỮ NGUYÊN CODE CŨ)
   const btns = dragItem.querySelectorAll(".customBtn");
   btns.forEach(btn => {
     btn.style.cssText = `
@@ -142,7 +133,6 @@
     btn.addEventListener("mouseup", off);
   });
 
-  // 4. XỬ LÝ KÉO THẢ (DRAG) - GIỮ NGUYÊN
   const header = document.getElementById('dragHeader');
   const closeBtn = document.getElementById('closeBtn');
 
@@ -176,7 +166,6 @@
   document.addEventListener('touchend', dragEnd);
   closeBtn.onclick = () => dragItem.remove();
 
-  // 5. LOGIC TAB 2: AUTO & HIGHLIGHT (CODE GỐC CỦA BẠN)
   
   // === AUTO FULL ĐIỂM ===
   document.getElementById('runBtn').onclick = async () => {
@@ -206,7 +195,7 @@
     } catch (err) { console.error('Lỗi:', err); }
   };
 
-  // === HIGHLIGHT GIỐNG CODE CŨ ===
+  // === HIGHLIGHT ===
   let highlightActive = false;
   const highlightBtn = document.getElementById('highlightBtn');
 
@@ -241,7 +230,6 @@
     } catch (err) { console.error('Lỗi highlight:', err); }
   };
 
-  // 6. LOGIC TAB 3: A.I (MỚI)
   document.getElementById('askAiBtn').onclick = () => {
       const input = document.getElementById('aiInput');
       const output = document.getElementById('aiResponse');
@@ -249,16 +237,14 @@
 
       if (!question) return;
 
-      // Hiển thị câu hỏi của user
       output.innerHTML += `<div style="margin-top:5px; color:#c0392b;"><b>Bạn:</b> ${question}</div>`;
       output.innerHTML += `<div style="color:#666;"><b>Searcher:</b> Đang tìm kiếm...</div>`;
       output.scrollTop = output.scrollHeight;
 
-      // Logic giả lập AI (Mở Google Search vì không có API Key)
       setTimeout(() => {
           window.open(`https://www.google.com/search?q=${encodeURIComponent(question)}`, '_blank');
           output.lastElementChild.innerHTML = `<b>Searcher:</b> Đã mở kết quả tìm kiếm cho: "${question}"`;
-          input.value = ""; // Xóa ô nhập
+          input.value = "";
       }, 500);
   };
 
