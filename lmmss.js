@@ -64,41 +64,59 @@
         <div style="font-weight:700;font-size:14px;line-height:1;">Hỗ trợ học tập</div>
         <div style="font-size:11px;opacity:0.85;">By minhh</div>
       </div>
-      <button id="closeBtn" style="
-        background: rgba(255,255,255,0.2); border: none; color: white;
-        width: 26px; height: 26px; border-radius: 6px; cursor: pointer; font-size: 16px;
-      ">×</button>
+      <div style="display: flex; gap: 5px;">
+        <button id="toggleUIBtn" style="
+          background: rgba(255,255,255,0.2); border: none; color: white;
+          width: 26px; height: 26px; border-radius: 6px; cursor: pointer; font-size: 16px;
+        ">—</button>
+        <button id="closeBtn" style="
+          background: rgba(255,255,255,0.2); border: none; color: white;
+          width: 26px; height: 26px; border-radius: 6px; cursor: pointer; font-size: 16px;
+        ">×</button>
+      </div>
     </header>
 
-    <div class="tab-bar">
-      <button class="tab-btn active" onclick="switchTab('tabMain', this)">Main</button>
-      <button class="tab-btn" onclick="switchTab('tabAuto', this)">Auto</button>
-      <button class="tab-btn" onclick="switchTab('tabAI', this)">Search</button>
-    </div>
+    <div id="mainContent">
+      <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('tabMain', this)">Main</button>
+        <button class="tab-btn" onclick="switchTab('tabAuto', this)">Auto</button>
+        <button class="tab-btn" onclick="switchTab('tabAI', this)">Search</button>
+      </div>
 
-    <div id="tabMain" class="tab-content active">
-        <h3 style="margin: 0; color: #c0392b;">Yo</h3>
-        <p style="font-size: 13px; line-height: 1.4; color: #444;">
-            Chào mày đến với "công cụ" hỗ trợ học tập.<br>
-            - <b>Tab Auto:</b> Các chức năng giúp mày biết đáp án.<br>
-            - <b>Tab Search:</b> Tìm kiếm những câu hỏi khó hoặc "Auto" ko thể giúp mày ( do chưa biết làm A.I nên làm tab này chức:() ).
-        </p>
-        <div style="font-size: 11px; color: #888; text-align: right; margin-top: 10px;">29/1/2026 - By minhh</div>
-    </div>
+      <div id="tabMain" class="tab-content active">
+          <h3 style="margin: 0; color: #c0392b;">Yo</h3>
+          <p style="font-size: 13px; line-height: 1.4; color: #444;">
+              Chào mày đến với "công cụ" hỗ trợ học tập.<br>
+              - <b>Tab Auto:</b> Các chức năng giúp mày biết đáp án.<br>
+              - <b>Tab Search:</b> Tìm kiếm những câu hỏi khó hoặc "Auto" ko thể giúp mày.<br>
+              - <b>Bấm phím F hoặc C để ẩn/hiện nhanh Menu.</b>
+          </p>
+          <div style="font-size: 11px; color: #888; text-align: right; margin-top: 10px;">29/1/2026 - By minhh</div>
+      </div>
 
-    <div id="tabAuto" class="tab-content">
-      <button id="runBtn" class="customBtn">Chọn tất cả đáp án</button>
-      <button id="highlightBtn" class="customBtn">Highlight đáp án</button>
-    </div>
+      <div id="tabAuto" class="tab-content">
+        <button id="runBtn" class="customBtn">Chọn tất cả đáp án</button>
+        <button id="highlightBtn" class="customBtn">Highlight đáp án</button>
+      </div>
 
-    <div id="tabAI" class="tab-content">
-        <div id="aiResponse"><i>Đang chờ câu hỏi</i></div>
-        <input type="text" id="aiInput" placeholder="Nhập câu hỏi...">
-        <button id="askAiBtn" class="customBtn">Gửi câu hỏi</button>
+      <div id="tabAI" class="tab-content">
+          <div id="aiResponse"><i>Đang chờ câu hỏi</i></div>
+          <input type="text" id="aiInput" placeholder="Nhập câu hỏi...">
+          <button id="askAiBtn" class="customBtn">Gửi câu hỏi</button>
+      </div>
     </div>
   `;
 
   document.body.appendChild(dragItem);
+
+  const mainContent = document.getElementById('mainContent');
+  const toggleUI = () => {
+    if (mainContent.style.display === 'none') {
+      mainContent.style.display = 'block';
+    } else {
+      mainContent.style.display = 'none';
+    }
+  };
 
   window.switchTab = (tabId, btn) => {
     dragItem.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -135,11 +153,13 @@
 
   const header = document.getElementById('dragHeader');
   const closeBtn = document.getElementById('closeBtn');
+  const toggleBtn = document.getElementById('toggleUIBtn');
 
   let active = false, currentX = 0, currentY = 0;
   let initialX = 0, initialY = 0, xOffset = 0, yOffset = 0;
 
   const dragStart = e => {
+    if (e.target.closest('button')) return; 
     active = true;
     const evt = e.touches ? e.touches[0] : e;
     initialX = evt.clientX - xOffset;
@@ -164,9 +184,17 @@
   header.addEventListener('touchstart', dragStart, { passive: true });
   document.addEventListener('touchmove', dragMove, { passive: true });
   document.addEventListener('touchend', dragEnd);
-  closeBtn.onclick = () => dragItem.remove();
-
   
+  closeBtn.onclick = () => dragItem.remove();
+  toggleBtn.onclick = toggleUI;
+
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.key.toLowerCase() === 'c' || e.key.toLowerCase() === 'f') {
+      toggleUI();
+    }
+  });
+
   // === AUTO FULL ĐIỂM ===
   document.getElementById('runBtn').onclick = async () => {
     try {
