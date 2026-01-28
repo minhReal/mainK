@@ -1,4 +1,4 @@
-// ờ, skibidi - Version 3 Tab //
+// ờ, skibidi //
 
 (() => {
   // Chặn tạo trùng
@@ -85,9 +85,9 @@
         <p style="font-size: 13px; line-height: 1.4; color: #444;">
             Chào mừng bạn đến với "công cụ" hỗ trợ học tập.<br>
             - <b>Tab Auto:</b> Các chức năng giúp bạn biết đáp án.<br>
-            - <b>Tab Search:</b> Tìm kiếm những câu hỏi khó hoặc "Auto" ko thể giúp bạn.
+            - <b>Tab Search:</b> Tìm kiếm những câu hỏi khó hoặc "Auto" ko thể giúp bạn ( do chưa biết làm A.I nên làm tab này chức:) ).
         </p>
-        <div style="font-size: 11px; color: #888; text-align: right; margin-top: 10px;">Updated ngày 29/1/2026- By minhh</div>
+        <div style="font-size: 11px; color: #888; text-align: right; margin-top: 10px;">29/1/2026- By minhh</div>
     </div>
 
     <div id="tabAuto" class="tab-content">
@@ -251,13 +251,13 @@
 
       // Hiển thị câu hỏi của user
       output.innerHTML += `<div style="margin-top:5px; color:#c0392b;"><b>Bạn:</b> ${question}</div>`;
-      output.innerHTML += `<div style="color:#666;"><b>A.I:</b> Đang tìm kiếm...</div>`;
+      output.innerHTML += `<div style="color:#666;"><b>Searcher:</b> Đang tìm kiếm...</div>`;
       output.scrollTop = output.scrollHeight;
 
       // Logic giả lập AI (Mở Google Search vì không có API Key)
       setTimeout(() => {
           window.open(`https://www.google.com/search?q=${encodeURIComponent(question)}`, '_blank');
-          output.lastElementChild.innerHTML = `<b>A.I:</b> Đã mở kết quả tìm kiếm cho: "${question}"`;
+          output.lastElementChild.innerHTML = `<b>Searcher:</b> Đã mở kết quả tìm kiếm cho: "${question}"`;
           input.value = ""; // Xóa ô nhập
       }, 500);
   };
