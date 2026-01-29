@@ -124,10 +124,10 @@
           <p style="font-size: 13px; line-height: 1.4; color: #444;">
               <strong>Chào mày đến với "công cụ" hỗ trợ học tập.<br>
                <b>Những thứ m cần biết:</b>
-                • Tab Auto: Các chức năng giúp mày biết đáp án.<br>
-                • Toggle: Bấm phím.<br>
+                • <b>Nếu lỗi:</b> Nói cho t để t fix
+                • <b>Toggle:</b> Bấm phím F hoặc C để ẩn ui.<br>
           </p>
-          <div style="font-size: 11px; color: #888; text-align: right; margin-top: 10px;">29/1/2026 - By minhh</div>
+          <div style="font-size: 11px; color: #888; text-align: right; margin-top: 10px;">29/1/2026 - By minhh và A.I</div>
       </div>
 
       <div id="tabAuto" class="tab-content">
