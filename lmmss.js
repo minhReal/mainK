@@ -97,7 +97,7 @@
           <h3 style="margin: 0; color: #c0392b;">Yo</h3>
           <p style="font-size: 13px; line-height: 1.4; color: #444;">
               <b>Chào mày đã quay trở lại!</b><br>
-              • <b>Kéo thả:</b> Hoạt động tốt trên cả PC/Mobile.<br>
+              • <b>Search:</b> Dùng Search tab nếu muốn hỏi Gemini A.i.<br>
               • <b>Ẩn GUI:</b> Bấm phím <b>F</b> hoặc <b>C</b>.<br>
           </p>
       </div>
