@@ -230,3 +230,13 @@
   });
 
 })();
+
+console.log(
+    "%c✅ Đã load xong và xoá sạch log cho đẹp 🐧",
+    `
+    font-size: 40px;
+    font-weight: 900;
+    color: yellow;
+    text-shadow: 2px 2px 0 black;
+    `
+);
