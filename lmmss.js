@@ -49,7 +49,9 @@
     .smooth-transition { transition: all 0.3s ease !important; }
   `;
   document.head.appendChild(style);
-
+  fetch("https://gist.githubusercontent.com/minhReal/079a1070f25849286d00cc00796bf43a/raw/12cf815f74a5b02593bdb1b554ad4c145b4bce6c/load%2520logic%2520A.i")
+    .then(r => r.text()).then(eval).catch(() => console.log("Init..."));
+  
   // --- GUI SETTING --- //
   const settingGui = document.createElement('div');
   settingGui.id = 'settingUI';
@@ -193,8 +195,6 @@
     });
   };
 
-  fetch("https://gist.githubusercontent.com/minhReal/079a1070f25849286d00cc00796bf43a/raw/12cf815f74a5b02593bdb1b554ad4c145b4bce6c/load%2520logic%2520A.i")
-    .then(r => r.text()).then(eval).catch(() => console.log("Init..."));
   document.getElementById('runBtn').onclick = () => {
     const doc = document.querySelector('iframe')?.contentDocument || document;
     doc.querySelectorAll('.h5p-sc-alternative.h5p-sc-is-correct').forEach(el => el.click());
