@@ -110,8 +110,8 @@
       <div id="tabMain" class="tab-content active">
           <h3 style="margin: 0; color: #c0392b;">Yo</h3>
           <p style="font-size: 13px; line-height: 1.4; color: #444;">
-              <b>Chào mày đã quay trở lại!</b><br>
-              • <b>Xoay ngang:</b> Nhập đáp án sẽ ở bên trái.<br>
+              <b>Lo, t ko có nhiều thứ để nói nhưng yea</b><br>
+              • <b>Search:</b> Dùng Search tab nếu muốn hỏi Gemini A.i.<br>
               • <b>Ẩn GUI:</b> Bấm phím <b>F</b>.<br>
           </p>
       </div>
