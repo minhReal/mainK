@@ -16,7 +16,7 @@
     display: flex; align-items: flex-start;
   `;
 
-  // --- STYLE CSS (Đã thêm logic đảo chiều) --- //
+  // --- STYLE CSS --- //
   const style = document.createElement('style');
   style.innerHTML = `
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -70,7 +70,7 @@
     <div style="padding: 10px; background: #333; color: #fff; font-size: 12px; font-weight: bold; text-align: center;">SETTING</div>
     <div style="padding: 12px; display: flex; flex-direction: column; gap: 10px;">
       <div style="display: flex; align-items: center; justify-content: space-between;">
-        <span style="font-size: 12px; color: #333;">Xoay ngang AI</span>
+        <span style="font-size: 12px; color: #333;">Xoay ngang (cho AI tab)</span>
         <label class="switch"><input type="checkbox" id="toggleRotate"><span class="slider"></span></label>
       </div>
       <div style="display: flex; align-items: center; justify-content: space-between;">
@@ -138,7 +138,7 @@
              <div style="display: flex; align-items: center; gap: 8px;">
                 <button id="addAnsBtn" class="square-btn">+</button>
                 <button id="removeAnsBtn" class="square-btn" style="background:#888;">—</button>
-                <span style="font-size: 11px; color: #000; opacity: 0.5; font-style: italic; white-space: nowrap;">Không bắt buộc</span>
+                <span style="font-size: 11px; color: #000; opacity: 0.5; font-style: italic; white-space: nowrap;">ko nhập đáp án cũng đc</span>
              </div>
           </div>
       </div>
