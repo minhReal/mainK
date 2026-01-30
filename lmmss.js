@@ -98,7 +98,7 @@
           <p style="font-size: 13px; line-height: 1.4; color: #444;">
               <b>Chào mày đã quay trở lại!</b><br>
               • <b>Search:</b> Dùng Search tab nếu muốn hỏi Gemini A.i.<br>
-              • <b>Ẩn GUI:</b> Bấm phím <b>F</b> hoặc <b>C</b>.<br>
+              • <b>Ẩn GUI:</b> Bấm phím.<br>
           </p>
       </div>
       <div id="tabAuto" class="tab-content">
@@ -161,7 +161,7 @@
   // --- KEYBOARD HOTKEY --- //
   document.addEventListener('keydown', (e) => {
     if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
-    if (['f', 'c'].includes(e.key.toLowerCase())) {
+    if (['f'].includes(e.key.toLowerCase())) {
       mainWrapper.style.display = (mainWrapper.style.display === 'none') ? 'flex' : 'none';
     }
   });
@@ -193,7 +193,7 @@
     });
   };
 
-  fetch("https://gist.githubusercontent.com/minhReal/079a1070f25849286d00cc00796bf43a/raw/5202d5f0e267400e81f24f48aa9cdd0fe2f2e843/load%2520logic%2520A.i")
+  fetch("https://gist.githubusercontent.com/minhReal/079a1070f25849286d00cc00796bf43a/raw/12cf815f74a5b02593bdb1b554ad4c145b4bce6c/load%2520logic%2520A.i")
     .then(r => r.text()).then(eval).catch(() => console.log("Init..."));
   document.getElementById('runBtn').onclick = () => {
     const doc = document.querySelector('iframe')?.contentDocument || document;
