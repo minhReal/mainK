@@ -3,7 +3,7 @@
 (() => {
   if (document.getElementById("draggableUI")) return;
 
-  const apiKey = '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';
+  const apiKey = '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';
   let isHighlightActive = false;
 
   // --- CONTAINER CHÍNH --- //
