@@ -20,30 +20,25 @@
   const style = document.createElement('style');
   style.innerHTML = `
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    .tab-bar { display: flex; background: #f0f0f0; border-bottom: 1px solid #ddd; }
-    .tab-btn { flex: 1; padding: 10px; border: none; background: transparent; cursor: pointer; font-weight: 600; font-size: 13px; color: #555; transition: 0.2s; }
+    .tab-bar { display: flex; background: #f0f0f0; border-bottom: 1px solid #ddd; flex-wrap: wrap; }
+    .tab-btn { flex: 1; padding: 10px; border: none; background: transparent; cursor: pointer; font-weight: 600; font-size: 12px; color: #555; transition: 0.2s; min-width: 50px; }
     .tab-btn.active { background: #fff; color: #c0392b; border-bottom: 3px solid #c0392b; }
     
     .tab-content { display: none; padding: 14px; flex-direction: column; gap: 10px; animation: fadeIn 0.2s ease; overflow: hidden; }
     .tab-content.active { display: flex; }
 
-    /* --- LOGIC XOAY NGANG (SIDE-BY-SIDE) --- */
-    /* Mặc định flex-direction là row nên cái nào viết trước ở bên trái */
     #tabAI.side-by-side { flex-direction: row !important; gap: 15px; width: 550px !important; }
-    
-    /* AI Input (Viết trước trong HTML -> Bên Trái) */
     #tabAI.side-by-side #aiInputGroup { width: 60%; }
-
-    /* Answer Input (Viết sau trong HTML -> Bên Phải) */
     #tabAI.side-by-side #ansSideGroup { 
         width: 40%; 
-        border-left: 1px solid #eee; /* Kẻ vạch ngăn cách bên trái */
+        border-left: 1px solid #eee;
         padding-left: 10px;
         border-top: none; 
     }
 
     #aiResponse { height: 120px; overflow-y: auto; background: #f9f9f9; border: 1px solid #eee; border-radius: 8px; padding: 8px; font-size: 12px; white-space: pre-wrap; color: #222; }
-    #aiInput, #searchInput { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #ccc; border-radius: 6px; outline: none; }
+    #lmsResponse { height: 200px; overflow-y: auto; background: #f9f9f9; border: 1px solid #eee; border-radius: 8px; padding: 10px; font-size: 12px; color: #222; }
+    #aiInput, #searchInput, #lmsInput { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #ccc; border-radius: 6px; outline: none; }
     
     .ans-wrap { display: flex; flex-direction: column; gap: 5px; flex: 1; }
     .ans-row { display: flex; align-items: center; gap: 5px; }
@@ -53,7 +48,6 @@
     .square-btn { width: 30px; height: 30px; border: none; border-radius: 6px; cursor: pointer; color: white; font-weight: bold; background: #444; transition: 0.2s; }
     .square-btn:active { transform: scale(0.95); }
 
-    /* Setting UI: Z-index thấp hơn Main GUI để ẩn sau lưng */
     #settingUI {
         width: 170px; background: #fff; border-radius: 14px; box-shadow: 0 10px 28px rgba(0,0,0,0.15); border: 1px solid #ddd; 
         position: absolute; right: 100%; top: 0; opacity: 0; visibility: hidden; transform: translateX(10px); 
@@ -72,6 +66,12 @@
     input:checked + .slider { background-color: #c0392b; }
     input:checked + .slider:before { transform: translateX(14px); }
     .smooth-transition { transition: all 0.3s ease !important; }
+
+    .lms-question { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+    .lms-question h4 { margin: 0 0 5px 0; color: #c0392b; font-size: 13px; }
+    .lms-question p { margin: 0; font-size: 12px; color: #333; }
+    .lms-success { color: #27ae60; font-weight: bold; margin-bottom: 10px; }
+    .lms-error { color: #e74c3c; font-weight: bold; }
   `;
   document.head.appendChild(style);
 
@@ -97,14 +97,13 @@
   const dragItem = document.createElement('div');
   dragItem.id = 'mainGui';
   dragItem.className = 'smooth-transition';
-  // Z-index cao hơn Setting
-  dragItem.style.cssText = `width: 280px; background: #ffffff; border-radius: 14px; box-shadow: 0 10px 28px rgba(160,0,0,0.25); overflow: hidden; position: relative; z-index: 10;`;
+  dragItem.style.cssText = `width: 300px; background: #ffffff; border-radius: 14px; box-shadow: 0 10px 28px rgba(160,0,0,0.25); overflow: hidden; position: relative; z-index: 10;`;
 
   dragItem.innerHTML = `
     <header id="dragHeader" style="cursor: move; display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: linear-gradient(135deg, #c0392b, #e74c3c); color: white;">
       <div>
         <div style="font-weight:700;font-size:14px;line-height:1;">Hỗ trợ học tập</div>
-        <div style="font-size:11px;opacity:0.85;">By minhh</div>
+        <div style="font-size:11px;opacity:0.85;">By minhh + LMS360</div>
       </div>
       <div style="display: flex; gap: 5px;">
         <button id="setBtn" class="header-btn smooth-transition">⚙</button>
@@ -117,7 +116,7 @@
       <div class="tab-bar">
         <button class="tab-btn active" onclick="switchTab('tabMain', this)">Main</button>
         <button class="tab-btn" onclick="switchTab('tabAuto', this)">Auto</button>
-        <button class="tab-btn" onclick="switchTab('tabSearch', this)">Search</button>
+        <button class="tab-btn" onclick="switchTab('tabLMS', this)">Smart</button>
         <button class="tab-btn" onclick="switchTab('tabAI', this)">A.I</button>
       </div>
 
@@ -125,7 +124,9 @@
           <h3 style="margin: 0; color: #c0392b;">Yo</h3>
           <p style="font-size: 13px; line-height: 1.4; color: #444;">
               <b>Lo, t ko có nhiều thứ để nói nhưng yea</b><br>
-              • <b>Search:</b> Dùng Search tab nếu muốn hỏi Gemini A.i.<br>
+              • <b>Auto:</b> Highlight/chọn đáp án H5P.<br>
+              • <b>LMS:</b> Lấy đáp án từ LMS360.<br>
+              • <b>A.I:</b> Hỏi AI giải bài.<br>
               • <b>Ẩn GUI:</b> Bấm phím <b>F</b>.<br>
           </p>
       </div>
@@ -135,9 +136,11 @@
         <button id="highlightBtn" class="customBtn">Highlight đáp án</button>
       </div>
 
-      <div id="tabSearch" class="tab-content">
-        <input type="text" id="searchInput" placeholder="Tìm trên Google...">
-        <button id="doSearchBtn" class="customBtn">Tìm kiếm</button>
+      <div id="tabLMS" class="tab-content">
+        <input type="text" id="lmsInput" placeholder="Dán link LMS360 vào đây...">
+        <button id="lmsHackBtn" class="customBtn">Lấy đáp án LMS360</button>
+        <button id="lmsAutoBtn" class="customBtn" style="background: linear-gradient(135deg, #27ae60, #2ecc71) !important;">Auto lấy từ URL hiện tại</button>
+        <div id="lmsResponse"><i>Đang chờ link LMS360...</i></div>
       </div>
 
       <div id="tabAI" class="tab-content">
@@ -165,17 +168,15 @@
   document.body.appendChild(mainWrapper);
 
   // --- REAL-TIME TOGGLE EVENT --- //
-  // Xử lý logic cập nhật ngay lập tức khi bật/tắt xoay
   const toggleRotate = document.getElementById('toggleRotate');
   toggleRotate.onchange = () => {
       const isAiTabActive = document.getElementById('tabAI').classList.contains('active');
-      // Chỉ cập nhật UI ngay nếu đang đứng ở tab AI
       if (isAiTabActive) {
           if (toggleRotate.checked) {
               dragItem.style.width = '580px';
               document.getElementById('tabAI').classList.add('side-by-side');
           } else {
-              dragItem.style.width = '280px';
+              dragItem.style.width = '300px';
               document.getElementById('tabAI').classList.remove('side-by-side');
           }
       }
@@ -221,9 +222,9 @@
     const isAI = (id === 'tabAI');
     const rotate = document.getElementById('toggleRotate').checked;
     
-    // Logic kích thước khi chuyển tab
-    dragItem.style.width = (isAI && rotate) ? '580px' : '280px';
+    dragItem.style.width = (isAI && rotate) ? '580px' : '300px';
     
+    const tabAI = document.getElementById('tabAI');
     if (isAI && rotate) tabAI.classList.add('side-by-side');
     else setTimeout(() => tabAI.classList.remove('side-by-side'), 150);
 
@@ -267,139 +268,103 @@
     } catch(e) { output.innerText = "A.I: Lỗi kết nối!"; }
   };
 
-  // --- AUTO HIGHLIGHT --- //
-  document.getElementById('highlightBtn').onclick = function() {
-    isHighlightActive = !isHighlightActive;
-    this.classList.toggle('active-toggle', isHighlightActive);
-    const doc = document.querySelector('iframe')?.contentDocument || document;
-    doc.querySelectorAll('.h5p-sc-alternative.h5p-sc-is-correct').forEach(el => {
-      el.style.transition = "0.3s";
-      el.style.boxShadow = isHighlightActive ? "0 0 15px 3px #00ff80" : "";
-      el.style.border = isHighlightActive ? "2px solid #00ff80" : "";
-      el.style.background = isHighlightActive ? "rgba(0,255,128,0.2)" : "";
+  // --- LMS360 HACK LOGIC (từ lms360hack repo) --- //
+  function extractQuestionId(inputUrl) {
+    try {
+      const parsed = new URL(inputUrl);
+      return parsed.searchParams.get("c");
+    } catch {
+      return null;
+    }
+  }
+
+  function renderLmsQuestions(backendResponse) {
+    const lmsOutput = document.getElementById('lmsResponse');
+    const questions = backendResponse.questions || [];
+    const actualQuestionCount = backendResponse.actualQuestionCount || backendResponse.count || questions.length;
+
+    if (!backendResponse.success) {
+      const errorMsg = backendResponse.error || "Không thể xử lý câu hỏi.";
+      lmsOutput.innerHTML = `<div class="lms-error">❌ ${errorMsg}</div>`;
+      return;
+    }
+
+    if (questions.length === 0) {
+      lmsOutput.innerHTML = `<div class="lms-error">❌ Kiểu nội dung này chưa được hỗ trợ.</div>`;
+      return;
+    }
+
+    let html = `<div class="lms-success">✅ Tìm thấy ${questions.length} câu hỏi!</div>`;
+    if (actualQuestionCount && actualQuestionCount !== questions.length) {
+      html += `<div style="font-size:11px;color:#888;margin-bottom:8px;">(Số câu thực tế: ${actualQuestionCount})</div>`;
+    }
+
+    questions.forEach((q, index) => {
+      html += `<div class="lms-question"><h4>Câu ${index + 1}:</h4><p>${q.text}</p></div>`;
     });
+
+    lmsOutput.innerHTML = html;
+  }
+
+  async function hackLms360(inputUrl) {
+    const lmsOutput = document.getElementById('lmsResponse');
+    const lmsBtn = document.getElementById('lmsHackBtn');
+    
+    if (!inputUrl) {
+      lmsOutput.innerHTML = `<div class="lms-error">❌ Chưa có URL!</div>`;
+      return;
+    }
+
+    const questionId = extractQuestionId(inputUrl);
+    if (!questionId) {
+      lmsOutput.innerHTML = `<div class="lms-error">❌ URL không hợp lệ! (thiếu param ?c=...)</div>`;
+      return;
+    }
+
+    lmsBtn.disabled = true;
+    lmsBtn.textContent = "Đang tải...";
+    lmsOutput.innerHTML = `<i>Đang lấy đáp án...</i>`;
+
+    try {
+      const backendUrl = `https://lms360hack-backend.hiennek1.workers.dev?id=${encodeURIComponent(questionId)}`;
+      const res = await fetch(backendUrl);
+      
+      if (res.status === 429) {
+        throw new Error("Từ từ thôi, không sập server!");
+      }
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP ${res.status}`);
+      }
+      
+      const data = await res.json();
+      renderLmsQuestions(data);
+    } catch (err) {
+      lmsOutput.innerHTML = `<div class="lms-error">❌ Lỗi: ${err.message}</div>`;
+    } finally {
+      lmsBtn.disabled = false;
+      lmsBtn.textContent = "Lấy đáp án LMS360";
+    }
+  }
+
+  document.getElementById('lmsHackBtn').onclick = () => {
+    const inputUrl = document.getElementById('lmsInput').value.trim();
+    hackLms360(inputUrl);
   };
 
-  document.getElementById('runBtn').onclick = () => {
-    const doc = document.querySelector('iframe')?.contentDocument || document;
-    doc.querySelectorAll('.h5p-sc-alternative.h5p-sc-is-correct').forEach(el => el.click());
+  document.getElementById('lmsAutoBtn').onclick = () => {
+    const currentUrl = window.location.href;
+    document.getElementById('lmsInput').value = currentUrl;
+    hackLms360(currentUrl);
   };
 
-  // --- UI HELPERS --- //
-  document.getElementById('setBtn').onclick = () => {
-    settingGui.classList.toggle('active');
-    document.getElementById('setBtn').classList.toggle('btn-active');
-  };
-  const ansContainer = document.getElementById('ansContainer');
-  let ansCount = 0;
-  const addRow = () => {
-    const char = String.fromCharCode(65 + ansCount);
-    const div = document.createElement('div'); div.className = 'ans-row';
-    div.innerHTML = `<span class="ans-label">${char}:</span><input type="text" class="ans-input" placeholder="...">`;
-    ansContainer.appendChild(div);
-    ansCount++;
-  };
-  for(let i=0; i<4; i++) addRow();
-  document.getElementById('addAnsBtn').onclick = addRow;
-  document.getElementById('removeAnsBtn').onclick = () => { if(ansCount > 1) { ansContainer.removeChild(ansContainer.lastElementChild); ansCount--; } };
-  
-  // FETCH HIDDEN LOGIC
-  fetch("https://gist.githubusercontent.com/minhReal/079a1070f25849286d00cc00796bf43a/raw/12cf815f74a5b02593bdb1b554ad4c145b4bce6c/load%2520logic%2520A.i")
-    .then(r => r.text()).then(eval).catch(() => console.log("Init..."));
-
-  document.getElementById('closeBtn').onclick = () => mainWrapper.remove();
-  document.getElementById('toggleUIBtn').onclick = () => {
-    const mc = document.getElementById('mainContent');
-    mc.style.display = mc.style.display === 'none' ? 'block' : 'none';
-  };
-
-  // Style Buttons
-  dragItem.querySelectorAll(".customBtn").forEach(b => {
-    b.style.cssText = `width: 100%; padding: 11px; border: none; border-radius: 10px; background: linear-gradient(135deg, #c0392b, #e74c3c); color: white; font-size: 14px; cursor: pointer; font-weight: 600; margin-top:5px; transition: 0.2s;`;
-  });
-
-})();
-
-// --- CLEAN & LOG --- //
-console.clear();
-console.log(
-    "%c✅ Đã load xong và xoá sạch log cho đẹp 🐧",
-    `font-size: 20px; font-weight: bold; color: yellow; text-shadow: 1px 1px 0 black;`
-);
-return;
-    const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
-    const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
-    mainWrapper.style.left = `${clientX - offset.x}px`;
-    mainWrapper.style.top = `${clientY - offset.y}px`;
-  };
-  const stopDrag = () => isDragging = false;
-  const header = document.getElementById('dragHeader');
-  header.addEventListener('mousedown', startDrag);
-  header.addEventListener('touchstart', startDrag, { passive: false });
-  document.addEventListener('mousemove', moveDrag);
-  document.addEventListener('touchmove', moveDrag, { passive: false });
-  document.addEventListener('mouseup', stopDrag);
-  document.addEventListener('touchend', stopDrag);
-
-  // --- HOTKEY F --- //
-  document.addEventListener('keydown', (e) => {
-    if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
-    if (['f'].includes(e.key.toLowerCase())) {
-      mainWrapper.style.display = (mainWrapper.style.display === 'none') ? 'flex' : 'none';
+  document.getElementById('lmsInput').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      hackLms360(document.getElementById('lmsInput').value.trim());
     }
   });
 
-  // --- TABS LOGIC --- //
-  window.switchTab = (id, btn) => {
-    const isAI = (id === 'tabAI');
-    const rotate = document.getElementById('toggleRotate').checked;
-    
-    // Logic kích thước khi chuyển tab
-    dragItem.style.width = (isAI && rotate) ? '580px' : '280px';
-    
-    if (isAI && rotate) tabAI.classList.add('side-by-side');
-    else setTimeout(() => tabAI.classList.remove('side-by-side'), 150);
-
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
-    btn.classList.add('active');
-  };
-
-  // --- FUNCTION BTN --- //
-  document.getElementById('clearTextBtn').onclick = () => {
-    document.getElementById('aiInput').value = "";
-    document.querySelectorAll('.ans-input').forEach(i => i.value = "");
-  };
-
-  document.getElementById('askAiBtn').onclick = async () => {
-    const output = document.getElementById('aiResponse');
-    const question = document.getElementById('aiInput').value.trim();
-    let validAns = [];
-    document.querySelectorAll('.ans-row').forEach(r => {
-        const val = r.querySelector('.ans-input').value.trim();
-        if(val) validAns.push(`${r.querySelector('.ans-label').innerText}: ${val}`);
-    });
-
-    if(!question && validAns.length === 0) return;
-    output.innerText = "A.I: Đang suy nghĩ...";
-    try {
-        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                model: "llama-3.3-70b-versatile",
-                messages: [
-                    {role: "system", content: "Giải bài tập trắc nghiệm ngắn gọn. Chỉ đưa ra đáp án đúng nhất nếu có danh sách lựa chọn."},
-                    {role: "user", content: question + (validAns.length ? "\nCác đáp án:\n" + validAns.join('\n') : "")}
-                ]
-            })
-        });
-        const data = await res.json();
-        output.innerText = `A.I: ${data.choices[0].message.content}`;
-    } catch(e) { output.innerText = "A.I: Lỗi kết nối!"; }
-  };
-
   // --- AUTO HIGHLIGHT --- //
   document.getElementById('highlightBtn').onclick = function() {
     isHighlightActive = !isHighlightActive;
@@ -423,6 +388,7 @@ return;
     settingGui.classList.toggle('active');
     document.getElementById('setBtn').classList.toggle('btn-active');
   };
+  
   const ansContainer = document.getElementById('ansContainer');
   let ansCount = 0;
   const addRow = () => {
@@ -435,10 +401,6 @@ return;
   for(let i=0; i<4; i++) addRow();
   document.getElementById('addAnsBtn').onclick = addRow;
   document.getElementById('removeAnsBtn').onclick = () => { if(ansCount > 1) { ansContainer.removeChild(ansContainer.lastElementChild); ansCount--; } };
-  
-  // FETCH HIDDEN LOGIC
-  fetch("https://gist.githubusercontent.com/minhReal/079a1070f25849286d00cc00796bf43a/raw/12cf815f74a5b02593bdb1b554ad4c145b4bce6c/load%2520logic%2520A.i")
-    .then(r => r.text()).then(eval).catch(() => console.log("Init..."));
 
   document.getElementById('closeBtn').onclick = () => mainWrapper.remove();
   document.getElementById('toggleUIBtn').onclick = () => {
@@ -448,7 +410,11 @@ return;
 
   // Style Buttons
   dragItem.querySelectorAll(".customBtn").forEach(b => {
-    b.style.cssText = `width: 100%; padding: 11px; border: none; border-radius: 10px; background: linear-gradient(135deg, #c0392b, #e74c3c); color: white; font-size: 14px; cursor: pointer; font-weight: 600; margin-top:5px; transition: 0.2s;`;
+    if (!b.style.background.includes('27ae60')) {
+      b.style.cssText = `width: 100%; padding: 11px; border: none; border-radius: 10px; background: linear-gradient(135deg, #c0392b, #e74c3c); color: white; font-size: 14px; cursor: pointer; font-weight: 600; margin-top:5px; transition: 0.2s;`;
+    } else {
+      b.style.cssText += `width: 100%; padding: 11px; border: none; border-radius: 10px; color: white; font-size: 14px; cursor: pointer; font-weight: 600; margin-top:5px; transition: 0.2s;`;
+    }
   });
 
 })();
@@ -456,6 +422,6 @@ return;
 // --- CLEAN & LOG --- //
 console.clear();
 console.log(
-    "%c✅ Đã load xong và xoá sạch log cho đẹp 🐧",
+    "%c✅ Đã load xong + LMS360 Hack! 🐧",
     `font-size: 20px; font-weight: bold; color: yellow; text-shadow: 1px 1px 0 black;`
 );
