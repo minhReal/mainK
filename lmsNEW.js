@@ -437,39 +437,99 @@
   }
 
   function executeAutoSelect(confirmedQuestions) {
-    // Lấy tất cả .h5p-question theo thứ tự DOM
-    const allContainers = [];
-    getIframeDocs().forEach(doc => {
-      doc.querySelectorAll('.h5p-question').forEach(el => allContainers.push(el));
+    // Tách SC questions và non-SC (TF, MC)
+    // SC: tất cả slides nằm trong 1 .h5p-question, H5P tự advance sau khi click
+    // Non-SC: mỗi .h5p-question là 1 câu riêng
+
+    const allDocs = getIframeDocs();
+
+    // Gom SC container (chứa .h5p-sc-slide)
+    const scContainers = [];
+    allDocs.forEach(doc => {
+      doc.querySelectorAll('.h5p-question.h5p-single-choice-set, .h5p-question:has(.h5p-sc-slide)').forEach(el => {
+        scContainers.push(el);
+      });
     });
 
-    // Map từng câu với container: dùng Set để không dùng lại container đã dùng
-    const usedIdx = new Set();
+    // Gom non-SC containers (TF, MC) - không phải SC
+    const otherContainers = [];
+    allDocs.forEach(doc => {
+      doc.querySelectorAll('.h5p-question').forEach(el => {
+        const isSC = el.querySelector('.h5p-sc-slide');
+        if (!isSC) otherContainers.push(el);
+      });
+    });
 
-    const mapped = confirmedQuestions.map(q => {
-      if (q.type !== 'choice' || !q.selectedOption) return null;
-      const needle = norm(q.qText.substring(0, 20));
-      // Tìm container chứa text câu hỏi, bỏ qua đã dùng
-      for (let i = 0; i < allContainers.length; i++) {
-        if (usedIdx.has(i)) continue;
-        if (norm(allContainers[i].innerText).includes(needle)) {
-          usedIdx.add(i);
-          return { q, container: allContainers[i] };
-        }
-      }
-      console.warn('[H5P] No container for:', q.qText.substring(0,30));
-      return null;
-    }).filter(Boolean);
+    // Phân loại confirmedQuestions
+    const scQuestions = [];
+    const otherQuestions = [];
+
+    confirmedQuestions.forEach(q => {
+      if (q.type !== 'choice' || !q.selectedOption) return;
+      // Nếu có SC container và text khớp với bất kỳ sc-slide nào → SC
+      let isScQ = false;
+      allDocs.forEach(doc => {
+        if (isScQ) return;
+        doc.querySelectorAll('.h5p-sc-slide:not(.h5p-sc-set-results)').forEach(slide => {
+          if (norm(slide.innerText).includes(norm(q.qText.substring(0,20)))) isScQ = true;
+        });
+      });
+      if (isScQ) scQuestions.push(q);
+      else otherQuestions.push(q);
+    });
+
+    console.log('[H5P] SC questions:', scQuestions.length, '| Other:', otherQuestions.length);
 
     let delay = 0;
-    mapped.forEach(({ q, container }) => {
-      const c = container;
+
+    // === Xử lý SC: click tuần tự theo current-slide, H5P tự advance ===
+    if (scQuestions.length > 0 && scContainers.length > 0) {
+      const scCont = scContainers[0]; // thường chỉ có 1 SC set
+      scQuestions.forEach(q => {
+        const sel = q.selectedOption.text;
+        setTimeout(() => {
+          // Lấy current-slide tại thời điểm click
+          const curSlide = scCont.querySelector('.h5p-sc-current-slide');
+          if (curSlide) {
+            const alts = Array.from(curSlide.querySelectorAll('li.h5p-sc-alternative'));
+            let match = alts.find(li => norm(li.innerText) === norm(sel));
+            if (!match) match = alts.find(li => norm(li.innerText).includes(norm(sel)));
+            if (match) {
+              const iWin = match.ownerDocument.defaultView;
+              ['mousedown','mouseup','click'].forEach(ev =>
+                match.dispatchEvent(new iWin.MouseEvent(ev, {bubbles:true,cancelable:true}))
+              );
+              console.log('[SC] Clicked:', sel.substring(0,30));
+            } else {
+              console.warn('[SC] Alt not found:', sel, '| Available:', alts.map(a=>a.innerText.substring(0,20)).join(' / '));
+            }
+          } else {
+            console.warn('[SC] No current slide at delay', delay);
+          }
+        }, delay);
+        delay += 1100; // H5P SC animate ~800ms
+      });
+    }
+
+    // === Xử lý TF/MC: tìm container theo text ===
+    const usedIdx = new Set();
+    otherQuestions.forEach(q => {
       const sel = q.selectedOption.text;
+      const needle = norm(q.qText.substring(0, 20));
       setTimeout(() => {
-        const ok = clickAnswerInContainer(c, sel);
-        if (ok) setTimeout(() => clickCheckInContainer(c), 400);
+        let found = false;
+        for (let i = 0; i < otherContainers.length; i++) {
+          if (usedIdx.has(i)) continue;
+          if (norm(otherContainers[i].innerText).includes(needle)) {
+            usedIdx.add(i);
+            const ok = clickAnswerInContainer(otherContainers[i], sel);
+            if (ok) setTimeout(() => clickCheckInContainer(otherContainers[i]), 400);
+            found = true; break;
+          }
+        }
+        if (!found) console.warn('[H5P] No container for:', q.qText.substring(0,30));
       }, delay);
-      delay += 900;
+      delay += 1000;
     });
   }
 
@@ -598,7 +658,8 @@
       </div>
       <div id="tabLMS" class="tab-content">
         <button id="setupBtn" class="customBtn">Setup</button>
-        <button id="selectAnsBtn" class="customBtn">Lấy đáp án(có thể sai nếu là chọn đáp án)</button>
+        <button id="selectAnsBtn" class="customBtn">Xem chi tiết</button>
+        <button id="smartHighlightBtn" class="customBtn">Highlight/Fill</button>
         <div class="search-group">
           <input type="text" id="searchInput" placeholder="Tìm câu hỏi...">
           <button id="searchBtn" class="customBtn">🔎</button>
@@ -678,24 +739,65 @@
 
   document.getElementById('setupBtn').onclick = () => hackLmsDirect();
 
+  let isSmartHighlight = false;
+  document.getElementById('smartHighlightBtn').onclick = function() {
+    isSmartHighlight = !isSmartHighlight;
+    this.classList.toggle('active-toggle', isSmartHighlight);
+    this.textContent = isSmartHighlight ? 'Tắt Highlight' : 'Highlight/Fill';
+
+    const color = '#00e676';
+    getIframeDocs().forEach(doc => {
+      // SC correct
+      doc.querySelectorAll('.h5p-sc-alternative.h5p-sc-is-correct').forEach(el => {
+        el.style.outline = isSmartHighlight ? ('3px solid ' + color) : '';
+        el.style.background = isSmartHighlight ? 'rgba(0,230,118,0.15)' : '';
+      });
+      // TrueFalse
+      doc.querySelectorAll('.h5p-true-false-answer').forEach(el => {
+        const t = norm(el.innerText);
+        const tfResult = allResults.find(r => r.type === 'choice' &&
+          r.options.some(o => o.correct && norm(o.text) === t));
+        const isCorrect = tfResult && tfResult.options.find(o => norm(o.text) === t)?.correct;
+        el.style.outline = (isSmartHighlight && isCorrect) ? ('3px solid ' + color) : '';
+        el.style.background = (isSmartHighlight && isCorrect) ? 'rgba(0,230,118,0.15)' : '';
+      });
+      // MC correct
+      doc.querySelectorAll('li.h5p-answer').forEach(el => {
+        const inner = el.querySelector('.h5p-alternative-inner');
+        const t = norm(inner ? inner.innerText : el.innerText);
+        const mcResult = allResults.find(r => r.type === 'choice' &&
+          r.options.some(o => o.correct && norm(o.text) === t));
+        const isCorrect = mcResult && mcResult.options.find(o => norm(o.text) === t)?.correct;
+        el.style.outline = (isSmartHighlight && isCorrect) ? ('3px solid ' + color) : '';
+        el.style.background = (isSmartHighlight && isCorrect) ? 'rgba(0,230,118,0.15)' : '';
+      });
+      // Fill blanks: highlight ô nhập + điền đáp án
+      if (isSmartHighlight) {
+        const allInputs = Array.from(doc.querySelectorAll('input.h5p-text-input'));
+        const fillQs = allResults.filter(q => q.type === 'fill');
+        fillQs.forEach(q => {
+          q.blanks.forEach(b => {
+            const inp = allInputs[b.globalIndex];
+            if (!inp) return;
+            inp.style.outline = '3px solid ' + color;
+            inp.style.background = 'rgba(0,230,118,0.15)';
+            fillInput(inp, b.answer);
+          });
+        });
+      } else {
+        doc.querySelectorAll('input.h5p-text-input').forEach(inp => {
+          inp.style.outline = '';
+          inp.style.background = '';
+        });
+      }
+    });
+  };
+
   document.getElementById('selectAnsBtn').onclick = () => {
     if (!allResults.length) return alert('Vui lòng Quét trước!');
-
-    const choiceQ = allResults.filter(q => q.type === 'choice');
-    const fillQ   = allResults.filter(q => q.type === 'fill');
-
-    if (!choiceQ.length && !fillQ.length) {
-      return alert('Không tìm thấy dạng bài nào!');
-    }
-
-    if (choiceQ.length > 0) {
-      showConfirmModal(choiceQ, (confirmedChoice) => {
-        executeAutoSelect(confirmedChoice);
-        if (fillQ.length > 0) executeFillBlanks();
-      });
-    } else {
-      executeFillBlanks();
-    }
+    const fillQ = allResults.filter(q => q.type === 'fill');
+    if (fillQ.length > 0) executeFillBlanks();
+    else alert('Không có bài điền từ. Xem đáp án trong panel bên dưới.');
   };
 
   const filterQ = () => {
