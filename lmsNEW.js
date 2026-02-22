@@ -7,7 +7,10 @@
   function getIframeDocs() {
     const docs = [document];
     document.querySelectorAll('iframe').forEach(f => {
-      try { if (f.contentDocument) docs.push(f.contentDocument); } catch(e) {}
+      try {
+        const d = f.contentDocument;
+        if (d) docs.push(d);
+      } catch(e) { /* cross-origin iframe - bỏ qua */ }
     });
     return docs;
   }
@@ -43,38 +46,48 @@
     return (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
   }
 
-  function clickAnswerByText(text) {
-    if (!text) return;
+  function clickAnswerInContainer(container, text) {
     const target = norm(text);
-
-    const candidates = [];
-    getIframeDocs().forEach(doc => {
-      doc.querySelectorAll('li.h5p-answer').forEach(li => {
-        const inner = li.querySelector('.h5p-alternative-inner');
-        candidates.push({ el: li, text: norm(inner ? inner.innerText : li.innerText) });
-      });
-      doc.querySelectorAll('li.h5p-sc-alternative').forEach(li => {
-        const lbl = li.querySelector('.h5p-sc-label');
-        candidates.push({ el: li, text: norm(lbl ? lbl.innerText : li.innerText) });
-      });
-    });
-
-    if (!candidates.length) {
-      console.warn('[H5P] Không có candidate nào');
-      return;
+    const iWin = container.ownerDocument.defaultView;
+    const dispatch = el => {
+      ['mousedown','mouseup','click'].forEach(ev =>
+        el.dispatchEvent(new iWin.MouseEvent(ev, {bubbles:true,cancelable:true}))
+      );
+    };
+    // TrueFalse: div.h5p-true-false-answer
+    const tfAnswers = Array.from(container.querySelectorAll('.h5p-true-false-answer'));
+    if (tfAnswers.length) {
+      const match = tfAnswers.find(el => norm(el.innerText) === target);
+      if (match) { dispatch(match); return true; }
     }
-
-    let match = candidates.find(c => c.text === target);
-
-    if (!match) {
-      match = candidates.find(c => c.text.includes(target) || target.includes(c.text));
+    // SingleChoice: li.h5p-sc-alternative trong current slide
+    const scCurrent = container.querySelector('.h5p-sc-current-slide') || container;
+    const scAlts = Array.from(scCurrent.querySelectorAll('li.h5p-sc-alternative'));
+    if (scAlts.length) {
+      let match = scAlts.find(li => norm(li.innerText) === target);
+      if (!match) match = scAlts.find(li => norm(li.innerText).includes(target));
+      if (match) { dispatch(match); return true; }
     }
+    // MultiChoice: li.h5p-answer
+    const mcAlts = Array.from(container.querySelectorAll('li.h5p-answer'));
+    if (mcAlts.length) {
+      const inner = mcAlts.find(li => {
+        const el = li.querySelector('.h5p-alternative-inner');
+        return norm(el ? el.innerText : li.innerText) === target;
+      });
+      if (inner) { dispatch(inner); return true; }
+    }
+    console.warn('[H5P] Không click được:', JSON.stringify(text));
+    return false;
+  }
 
-    if (match) {
-      forceSelectElement(match.el);
-    } else {
-      console.warn('[H5P] Không tìm được:', JSON.stringify(text),
-        '| Candidates:', candidates.map(c => c.text).join(' / '));
+  function clickCheckInContainer(container) {
+    const btn = container.querySelector('.h5p-question-check-answer');
+    if (btn && !btn.disabled) {
+      const iWin = container.ownerDocument.defaultView;
+      ['mousedown','mouseup','click'].forEach(ev =>
+        btn.dispatchEvent(new iWin.MouseEvent(ev, {bubbles:true,cancelable:true}))
+      );
     }
   }
 
@@ -157,7 +170,7 @@
     lmsOutput.innerHTML = '<i>Đang setup...</i>';
     allResults = [];
 
-    getIframeDocs().forEach(doc => {
+    getIframeDocs().forEach(doc => { try {
       let h5pData = null;
       try {
         const win = doc.defaultView || doc.parentWindow;
@@ -165,7 +178,7 @@
       } catch(e) {}
 
       if (!h5pData) {
-        doc.querySelectorAll('script').forEach(s => {
+        try { doc.querySelectorAll('script').forEach(s => {
           if (h5pData) return;
           const txt = s.textContent;
           const m = txt.match(/H5PIntegration\s*=\s*(\{[\s\S]+?\});\s*(?:\/\/|$|\n)/);
@@ -174,7 +187,7 @@
             const m2 = txt.match(/H5PIntegration\s*=\s*(\{[\s\S]+\})/);
             if (m2) { try { h5pData = JSON.parse(m2[1]); } catch(e) {} }
           }
-        });
+        }); } catch(e) {}
       }
 
       if (h5pData) {
@@ -182,6 +195,62 @@
           try {
             let p = content.jsonContent;
             if (typeof p === 'string') p = JSON.parse(p);
+
+            // === H5P.InteractiveVideo ===
+            if (p.interactiveVideo && p.interactiveVideo.assets) {
+              const interactions = p.interactiveVideo.assets.interactions || [];
+              let ivIdx = 0;
+              interactions.forEach(item => {
+                const lib = (item.action && item.action.library) || '';
+                const params = (item.action && item.action.params) || {};
+                if (lib.includes('SingleChoiceSet')) {
+                  (params.choices || []).forEach(ch => {
+                    const qText = (ch.question||'').replace(/<[^>]+>/g,'').trim();
+                    const opts = (ch.answers||[]).map((a,i) => ({
+                      label: String.fromCharCode(65+i),
+                      text: (typeof a==='string'?a:(a.text||'')).replace(/<[^>]+>/g,'').trim(),
+                      correct: i===0
+                    })).filter(o=>o.text);
+                    if (qText && opts.length) allResults.push({type:'choice',qText,options:opts});
+                  });
+                } else if (lib.includes('TrueFalse')) {
+                  const qText = (params.question||'').replace(/<[^>]+>/g,'').trim();
+                  if (qText) {
+                    const tT=(params.l10n&&params.l10n.trueText)||'Đúng';
+                    const fT=(params.l10n&&params.l10n.falseText)||'Sai';
+                    const ok=params.correct==='true'||params.correct===true;
+                    allResults.push({type:'choice',qText,options:[
+                      {label:'A',text:tT,correct:ok},
+                      {label:'B',text:fT,correct:!ok}
+                    ]});
+                  }
+                } else if (lib.includes('Blanks')) {
+                  (params.questions||[]).forEach(qHtml => {
+                    if (typeof qHtml!=='string') return;
+                    const raw=qHtml.replace(/<[^>]+>/g,'');
+                    const cl=raw.replace(/^\d+\.\s*/,'');
+                    const si=cl.indexOf('*'),di=cl.indexOf('.');
+                    let qt,pv;
+                    if (di>=0&&di<si){qt=cl.substring(0,di).trim();pv=cl.substring(di+1).replace(/\*[^*]+\*/g,'___').trim();}
+                    else{const nh=cl.replace(/\s*\([^)]+\)\s*$/,'').trim();qt=nh.replace(/\*[^*]+\*/g,'___').trim();pv=qt;}
+                    const ms=[...cl.matchAll(/\*([^*]+)\*/g)];
+                    const bl=ms.map(m=>({answer:m[1].trim(),globalIndex:ivIdx++})).filter(b=>b.answer);
+                    if (bl.length) allResults.push({type:'fill',qText:qt,fillPreview:pv,blanks:bl});
+                  });
+                } else if (lib.includes('MultiChoice')) {
+                  const qText=(params.question||'').replace(/<[^>]+>/g,'').trim();
+                  if (qText) {
+                    const opts=(params.answers||[]).map((a,i)=>({
+                      label:String.fromCharCode(65+i),
+                      text:(a.text||'').replace(/<[^>]+>/g,'').trim(),
+                      correct:a.correct===true
+                    })).filter(o=>o.text);
+                    if (opts.length) allResults.push({type:'choice',qText,options:opts});
+                  }
+                }
+              });
+              if (allResults.length>0) return;
+            }
 
             if (p.questions && Array.isArray(p.questions) && typeof p.questions[0] === 'string') {
               let blankIndex = 0;
@@ -251,8 +320,23 @@
                   if (opts.length && qText) { allResults.push({type:'choice', qText, options:opts}); return; }
                 }
               }
+              // TrueFalse: có field "correct" = "true"/"false" và l10n.trueText/falseText
+              if ((obj.correct === 'true' || obj.correct === 'false' || obj.correct === true || obj.correct === false)
+                  && obj.l10n && (obj.l10n.trueText || obj.l10n.falseText)) {
+                const qText = (obj.question||obj.text||obj.statement||'').replace(/<[^>]+>/g,'').trim();
+                if (qText) {
+                  const tT = obj.l10n.trueText  || 'Đúng';
+                  const fT = obj.l10n.falseText || 'Sai';
+                  const ok = obj.correct === 'true' || obj.correct === true;
+                  allResults.push({type:'choice', qText, options:[
+                    {label:'A', text:tT, correct: ok},
+                    {label:'B', text:fT, correct:!ok}
+                  ]});
+                  return;
+                }
+              }
               Object.entries(obj).forEach(([k,v]) => {
-                if (['answers','tipsAndFeedback','feedbackOnCorrect','feedbackOnWrong'].includes(k)) return;
+                if (['answers','tipsAndFeedback','feedbackOnCorrect','feedbackOnWrong','l10n','media'].includes(k)) return;
                 extractQ(v, depth+1);
               });
             };
@@ -262,10 +346,15 @@
         });
       }
 
-      if (allResults.length === 0) {
-        doc.querySelectorAll('.h5p-sc-slide').forEach((slide, qi) => {
+      // DOM fallback: SC slides
+      try {
+        doc.querySelectorAll('.h5p-sc-slide.h5p-sc').forEach((slide) => {
+          if (slide.classList.contains('h5p-sc-set-results')) return;
           const qEl = slide.querySelector('.h5p-sc-question');
-          const qText = qEl ? qEl.innerText.trim() : ('Câu '+(qi+1));
+          const qText = qEl ? qEl.innerText.trim() : '';
+          if (!qText) return;
+          const already = allResults.some(r => norm(r.qText).includes(norm(qText.substring(0,20))));
+          if (already) return;
           const opts = [];
           slide.querySelectorAll('.h5p-sc-alternative').forEach((alt, i) => {
             const lbl = alt.querySelector('.h5p-sc-label');
@@ -273,8 +362,28 @@
           });
           if (opts.length) allResults.push({type:'choice', qText, options:opts});
         });
-      }
-    });
+      } catch(e) {}
+      // DOM fallback: TrueFalse
+      try {
+        doc.querySelectorAll('.h5p-question.h5p-true-false').forEach((tf) => {
+          const qEl = tf.querySelector('.h5p-question-content') || tf.querySelector('.h5p-true-false-question-text') || tf;
+          // Lấy text câu hỏi: bỏ phần Đúng/Sai
+          const answers = Array.from(tf.querySelectorAll('.h5p-true-false-answer'));
+          let qText = tf.innerText.trim();
+          answers.forEach(a => { qText = qText.replace(a.innerText.trim(), '').trim(); });
+          qText = qText.replace(/\s+/g,' ').trim();
+          if (!qText) return;
+          const already = allResults.some(r => norm(r.qText).includes(norm(qText.substring(0,20))));
+          if (already) return;
+          const opts = answers.map((a, i) => ({
+            label: String.fromCharCode(65+i),
+            text: a.innerText.trim(),
+            correct: a.classList.contains('h5p-true-false-answer-correct') || a.getAttribute('aria-pressed') === 'true'
+          }));
+          if (opts.length) allResults.push({type:'choice', qText, options:opts});
+        });
+      } catch(e) {}
+    } catch(e) { console.log("Doc err:", e.message); } });
 
     const seen = new Set();
     allResults = allResults.filter(r => {
@@ -328,12 +437,43 @@
   }
 
   function executeAutoSelect(confirmedQuestions) {
-    confirmedQuestions.forEach(q => {
-      if (q.type === 'choice' && q.selectedOption) {
-        clickAnswerByText(q.selectedOption.text);
+    // Lấy tất cả .h5p-question theo thứ tự DOM
+    const allContainers = [];
+    getIframeDocs().forEach(doc => {
+      doc.querySelectorAll('.h5p-question').forEach(el => allContainers.push(el));
+    });
+
+    // Map từng câu với container: dùng Set để không dùng lại container đã dùng
+    const usedIdx = new Set();
+
+    const mapped = confirmedQuestions.map(q => {
+      if (q.type !== 'choice' || !q.selectedOption) return null;
+      const needle = norm(q.qText.substring(0, 20));
+      // Tìm container chứa text câu hỏi, bỏ qua đã dùng
+      for (let i = 0; i < allContainers.length; i++) {
+        if (usedIdx.has(i)) continue;
+        if (norm(allContainers[i].innerText).includes(needle)) {
+          usedIdx.add(i);
+          return { q, container: allContainers[i] };
+        }
       }
+      console.warn('[H5P] No container for:', q.qText.substring(0,30));
+      return null;
+    }).filter(Boolean);
+
+    let delay = 0;
+    mapped.forEach(({ q, container }) => {
+      const c = container;
+      const sel = q.selectedOption.text;
+      setTimeout(() => {
+        const ok = clickAnswerInContainer(c, sel);
+        if (ok) setTimeout(() => clickCheckInContainer(c), 400);
+      }, delay);
+      delay += 900;
     });
   }
+
+
 
   function executeFillBlanks() {
     const fillQs = allResults.filter(q => q.type === 'fill');
