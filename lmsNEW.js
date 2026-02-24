@@ -10,7 +10,7 @@
       try {
         const d = f.contentDocument;
         if (d) docs.push(d);
-      } catch(e) { /* cross-origin iframe - bỏ qua */ }
+      } catch(e) {  }
     });
     return docs;
   }
@@ -54,13 +54,13 @@
         el.dispatchEvent(new iWin.MouseEvent(ev, {bubbles:true,cancelable:true}))
       );
     };
-    // TrueFalse: div.h5p-true-false-answer
+    
     const tfAnswers = Array.from(container.querySelectorAll('.h5p-true-false-answer'));
     if (tfAnswers.length) {
       const match = tfAnswers.find(el => norm(el.innerText) === target);
       if (match) { dispatch(match); return true; }
     }
-    // SingleChoice: li.h5p-sc-alternative trong current slide
+    
     const scCurrent = container.querySelector('.h5p-sc-current-slide') || container;
     const scAlts = Array.from(scCurrent.querySelectorAll('li.h5p-sc-alternative'));
     if (scAlts.length) {
@@ -68,7 +68,7 @@
       if (!match) match = scAlts.find(li => norm(li.innerText).includes(target));
       if (match) { dispatch(match); return true; }
     }
-    // MultiChoice: li.h5p-answer
+    
     const mcAlts = Array.from(container.querySelectorAll('li.h5p-answer'));
     if (mcAlts.length) {
       const inner = mcAlts.find(li => {
@@ -196,7 +196,7 @@
             let p = content.jsonContent;
             if (typeof p === 'string') p = JSON.parse(p);
 
-            // === H5P.InteractiveVideo ===
+            
             if (p.interactiveVideo && p.interactiveVideo.assets) {
               const interactions = p.interactiveVideo.assets.interactions || [];
               let ivIdx = 0;
@@ -320,7 +320,7 @@
                   if (opts.length && qText) { allResults.push({type:'choice', qText, options:opts}); return; }
                 }
               }
-              // TrueFalse: có field "correct" = "true"/"false" và l10n.trueText/falseText
+              
               if ((obj.correct === 'true' || obj.correct === 'false' || obj.correct === true || obj.correct === false)
                   && obj.l10n && (obj.l10n.trueText || obj.l10n.falseText)) {
                 const qText = (obj.question||obj.text||obj.statement||'').replace(/<[^>]+>/g,'').trim();
@@ -346,7 +346,7 @@
         });
       }
 
-      // DOM fallback: SC slides
+      
       try {
         doc.querySelectorAll('.h5p-sc-slide.h5p-sc').forEach((slide) => {
           if (slide.classList.contains('h5p-sc-set-results')) return;
@@ -363,11 +363,11 @@
           if (opts.length) allResults.push({type:'choice', qText, options:opts});
         });
       } catch(e) {}
-      // DOM fallback: TrueFalse
+      
       try {
         doc.querySelectorAll('.h5p-question.h5p-true-false').forEach((tf) => {
           const qEl = tf.querySelector('.h5p-question-content') || tf.querySelector('.h5p-true-false-question-text') || tf;
-          // Lấy text câu hỏi: bỏ phần Đúng/Sai
+          
           const answers = Array.from(tf.querySelectorAll('.h5p-true-false-answer'));
           let qText = tf.innerText.trim();
           answers.forEach(a => { qText = qText.replace(a.innerText.trim(), '').trim(); });
@@ -437,13 +437,13 @@
   }
 
   function executeAutoSelect(confirmedQuestions) {
-    // Tách SC questions và non-SC (TF, MC)
-    // SC: tất cả slides nằm trong 1 .h5p-question, H5P tự advance sau khi click
-    // Non-SC: mỗi .h5p-question là 1 câu riêng
+    
+    
+    
 
     const allDocs = getIframeDocs();
 
-    // Gom SC container (chứa .h5p-sc-slide)
+    
     const scContainers = [];
     allDocs.forEach(doc => {
       doc.querySelectorAll('.h5p-question.h5p-single-choice-set, .h5p-question:has(.h5p-sc-slide)').forEach(el => {
@@ -451,7 +451,7 @@
       });
     });
 
-    // Gom non-SC containers (TF, MC) - không phải SC
+    
     const otherContainers = [];
     allDocs.forEach(doc => {
       doc.querySelectorAll('.h5p-question').forEach(el => {
@@ -460,13 +460,13 @@
       });
     });
 
-    // Phân loại confirmedQuestions
+    
     const scQuestions = [];
     const otherQuestions = [];
 
     confirmedQuestions.forEach(q => {
       if (q.type !== 'choice' || !q.selectedOption) return;
-      // Nếu có SC container và text khớp với bất kỳ sc-slide nào → SC
+      
       let isScQ = false;
       allDocs.forEach(doc => {
         if (isScQ) return;
@@ -482,13 +482,13 @@
 
     let delay = 0;
 
-    // === Xử lý SC: click tuần tự theo current-slide, H5P tự advance ===
+    
     if (scQuestions.length > 0 && scContainers.length > 0) {
-      const scCont = scContainers[0]; // thường chỉ có 1 SC set
+      const scCont = scContainers[0]; 
       scQuestions.forEach(q => {
         const sel = q.selectedOption.text;
         setTimeout(() => {
-          // Lấy current-slide tại thời điểm click
+          
           const curSlide = scCont.querySelector('.h5p-sc-current-slide');
           if (curSlide) {
             const alts = Array.from(curSlide.querySelectorAll('li.h5p-sc-alternative'));
@@ -507,11 +507,11 @@
             console.warn('[SC] No current slide at delay', delay);
           }
         }, delay);
-        delay += 1100; // H5P SC animate ~800ms
+        delay += 1100; 
       });
     }
 
-    // === Xử lý TF/MC: tìm container theo text ===
+    
     const usedIdx = new Set();
     otherQuestions.forEach(q => {
       const sel = q.selectedOption.text;
@@ -532,8 +532,6 @@
       delay += 1000;
     });
   }
-
-
 
   function executeFillBlanks() {
     const fillQs = allResults.filter(q => q.type === 'fill');
@@ -565,9 +563,9 @@
   const style = document.createElement('style');
   style.innerHTML = `
     @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-    .tab-bar{display:flex;background:#f0f0f0;border-bottom:1px solid #ddd;flex-wrap:wrap}
-    .tab-btn{flex:1;padding:10px;border:none;background:transparent;cursor:pointer;font-weight:600;font-size:12px;color:#555;transition:0.2s;min-width:50px}
-    .tab-btn.active{background:#fff;color:#c0392b;border-bottom:3px solid #c0392b}
+    .tab-bar{display:flex;background:#f5f5f5;padding:6px 8px;gap:4px;border-bottom:1px solid #e0e0e0}
+    .tab-btn{flex:1;padding:7px 4px;border:none;border-radius:8px;background:transparent;cursor:pointer;font-weight:600;font-size:12px;color:#888;transition:all 0.2s;min-width:40px}
+    .tab-btn.active{background:#c0392b;color:#fff;box-shadow:0 2px 8px rgba(192,57,43,0.35)}
     .tab-content{display:none;padding:14px;flex-direction:column;gap:10px;animation:fadeIn 0.2s ease;overflow:hidden}
     .tab-content.active{display:flex}
     #aiResponse{height:120px;overflow-y:auto;background:#f9f9f9;border:1px solid #eee;border-radius:8px;padding:8px;font-size:12px;white-space:pre-wrap;color:#222}
@@ -583,8 +581,9 @@
     #settingUI.active{opacity:1;visibility:visible;transform:translateX(-10px)}
     .header-btn{background:rgba(255,255,255,0.2);border:none;color:white;width:26px;height:26px;border-radius:6px;cursor:pointer}
     .customBtn{width:100%;padding:11px;border:none;border-radius:10px;background:linear-gradient(135deg,#c0392b,#e74c3c);color:white;font-size:14px;cursor:pointer;font-weight:600;margin-top:5px;transition:0.2s}
-    .customBtn:active{transform:scale(0.98)}
-    .customBtn.active-toggle{background:#27ae60!important;box-shadow:inset 0 2px 5px rgba(0,0,0,0.3)!important}
+    .customBtn{transition:background 0.25s,box-shadow 0.25s,transform 0.1s}
+    .customBtn:active{transform:scale(0.97)}
+    .customBtn.active-toggle{background:linear-gradient(135deg,#27ae60,#2ecc71)!important;box-shadow:0 0 0 3px rgba(46,204,113,0.4)!important}
     .switch{position:relative;display:inline-block;width:34px;height:20px}
     .switch input{opacity:0;width:0;height:0}
     .slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#ccc;border-radius:34px;transition:0.3s}
@@ -656,15 +655,18 @@
         <button id="runBtn" class="customBtn"> Chọn tất cả (Single Choice)</button>
         <button id="highlightBtn" class="customBtn">Highlight đáp án</button>
       </div>
-      <div id="tabLMS" class="tab-content">
+      <div id="tabLMS" class="tab-content" style="position:relative;padding-bottom:44px;">
         <button id="setupBtn" class="customBtn">Setup</button>
-        <button id="selectAnsBtn" class="customBtn">Xem chi tiết</button>
         <button id="smartHighlightBtn" class="customBtn">Highlight/Fill</button>
         <div class="search-group">
           <input type="text" id="searchInput" placeholder="Tìm câu hỏi...">
           <button id="searchBtn" class="customBtn">🔎</button>
         </div>
         <div id="lmsResponse"><i>Bấm "Setup" để bắt đầu...</i></div>
+        <div style="position:absolute;bottom:6px;left:0;display:flex;gap:6px;padding:0 4px;">
+          <button id="selectAnsBtn" title="Xem chi tiết" style="width:32px;height:32px;border:none;border-radius:8px;background:#e74c3c;color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.2s;">👁️</button>
+          <button id="copyAnsBtn" title="Copy đáp án" style="width:32px;height:32px;border:none;border-radius:8px;background:#e74c3c;color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.2s;">📋</button>
+        </div>
       </div>
       <div id="tabAI" class="tab-content">
         <div style="color:red;font-weight:bold;text-align:center;font-size:14px;border:2px dashed red;padding:5px;background:#ffeeee;">KO HOẠT ĐỘNG😢</div>
@@ -739,6 +741,31 @@
 
   document.getElementById('setupBtn').onclick = () => hackLmsDirect();
 
+  document.getElementById('copyAnsBtn').onclick = function() {
+    if (!allResults.length) return alert('Vui lòng Setup trước!');
+    const btn = this;
+    const rows = [];
+    allResults.forEach((q, qi) => {
+      if (q.type === 'choice') {
+        const correct = q.options.filter(o => o.correct);
+        const ans = correct.length ? correct.map(o => o.label + '. ' + o.text).join(', ') : '(Chưa xác định)';
+        rows.push('Câu ' + (qi+1) + ': ' + q.qText);
+        rows.push('→ ' + ans);
+      } else if (q.type === 'fill') {
+        rows.push('Câu ' + (qi+1) + ': ' + q.qText);
+        q.blanks.forEach((b, bi) => rows.push('→ Chỗ ' + (bi+1) + ': ' + b.answer));
+      }
+      rows.push('');
+    });
+    const text = rows.join('\n').trim();
+    const flash = () => { btn.textContent='✅'; btn.style.background='#27ae60'; setTimeout(() => { btn.textContent='📋'; btn.style.background='#e74c3c'; }, 1200); };
+    navigator.clipboard.writeText(text).then(flash).catch(() => {
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+      flash();
+    });
+  };
+
   let isSmartHighlight = false;
   document.getElementById('smartHighlightBtn').onclick = function() {
     isSmartHighlight = !isSmartHighlight;
@@ -747,12 +774,12 @@
 
     const color = '#00e676';
     getIframeDocs().forEach(doc => {
-      // SC correct
+      
       doc.querySelectorAll('.h5p-sc-alternative.h5p-sc-is-correct').forEach(el => {
         el.style.outline = isSmartHighlight ? ('3px solid ' + color) : '';
         el.style.background = isSmartHighlight ? 'rgba(0,230,118,0.15)' : '';
       });
-      // TrueFalse
+      
       doc.querySelectorAll('.h5p-true-false-answer').forEach(el => {
         const t = norm(el.innerText);
         const tfResult = allResults.find(r => r.type === 'choice' &&
@@ -761,7 +788,7 @@
         el.style.outline = (isSmartHighlight && isCorrect) ? ('3px solid ' + color) : '';
         el.style.background = (isSmartHighlight && isCorrect) ? 'rgba(0,230,118,0.15)' : '';
       });
-      // MC correct
+      
       doc.querySelectorAll('li.h5p-answer').forEach(el => {
         const inner = el.querySelector('.h5p-alternative-inner');
         const t = norm(inner ? inner.innerText : el.innerText);
@@ -771,7 +798,7 @@
         el.style.outline = (isSmartHighlight && isCorrect) ? ('3px solid ' + color) : '';
         el.style.background = (isSmartHighlight && isCorrect) ? 'rgba(0,230,118,0.15)' : '';
       });
-      // Fill blanks: highlight ô nhập + điền đáp án
+      
       if (isSmartHighlight) {
         const allInputs = Array.from(doc.querySelectorAll('input.h5p-text-input'));
         const fillQs = allResults.filter(q => q.type === 'fill');
@@ -793,11 +820,45 @@
     });
   };
 
-  document.getElementById('selectAnsBtn').onclick = () => {
-    if (!allResults.length) return alert('Vui lòng Quét trước!');
-    const fillQ = allResults.filter(q => q.type === 'fill');
-    if (fillQ.length > 0) executeFillBlanks();
-    else alert('Không có bài điền từ. Xem đáp án trong panel bên dưới.');
+  document.getElementById('selectAnsBtn').onclick = function() {
+    if (!allResults.length) return alert('Vui lòng Setup trước!');
+    const btn = this;
+    
+    document.getElementById('lmsDetailModal')?.remove();
+    const modal = document.createElement('div');
+    modal.id = 'lmsDetailModal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999999;display:flex;align-items:center;justify-content:center;font-family:"Segoe UI",sans-serif;';
+    let html = '<div style="background:#fff;border-radius:14px;padding:20px;max-width:460px;width:92vw;max-height:82vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">';
+    html += '<div style="font-weight:700;font-size:15px;color:#2c3e50;margin-bottom:14px;border-bottom:2px solid #eee;padding-bottom:8px;">📋 Chi tiết đáp án</div>';
+    allResults.forEach((q, qi) => {
+      html += '<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #f0f0f0;">';
+      html += '<div style="font-weight:600;font-size:13px;color:#2c3e50;margin-bottom:6px;">Câu '+(qi+1)+': '+q.qText.replace(/</g,'&lt;').substring(0,120)+'</div>';
+      if (q.type === 'choice') {
+        const hasCorrect = q.options.some(o => o.correct);
+        q.options.forEach(o => {
+          if (o.correct) {
+            html += '<div style="background:#e8f8f0;border-left:3px solid #27ae60;padding:5px 10px;border-radius:4px;font-size:13px;color:#1a7a4a;font-weight:600;margin-top:3px;">✅ '+o.label+'. '+o.text.replace(/</g,'&lt;')+'</div>';
+          } else {
+            html += '<div style="padding:4px 10px;border-left:3px solid #ddd;font-size:12px;color:#888;margin-top:2px;">'+o.label+'. '+o.text.replace(/</g,'&lt;')+'</div>';
+          }
+        });
+        if (!hasCorrect) html += '<div style="color:#e67e22;font-size:12px;margin-top:3px;">⚠️ Chưa xác định đáp án đúng</div>';
+      } else if (q.type === 'fill') {
+        q.blanks.forEach((b, bi) => {
+          html += '<div style="background:#eaf4fb;border-left:3px solid #3498db;padding:5px 10px;border-radius:4px;font-size:13px;color:#1a5276;font-weight:600;margin-top:3px;">✏️ Chỗ '+(bi+1)+': '+b.answer.replace(/</g,'&lt;')+'</div>';
+        });
+      }
+      html += '</div>';
+    });
+    html += '<button id="lmsDetailClose" style="width:100%;padding:10px;border:none;border-radius:8px;background:#e74c3c;color:#fff;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;">✕ Thoát</button>';
+    html += '</div>';
+    modal.innerHTML = html;
+    modal.querySelector('#lmsDetailClose').onclick = () => modal.remove();
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    document.body.appendChild(modal);
+    
+    btn.textContent = '✅'; btn.style.background='#27ae60';
+    setTimeout(() => { btn.textContent = '👁️'; btn.style.background='#e74c3c'; }, 1200);
   };
 
   const filterQ = () => {
@@ -809,7 +870,7 @@
   document.getElementById('searchBtn').onclick = filterQ;
   document.getElementById('searchInput').addEventListener('input', filterQ);
 
-  // Auto tab
+  
   document.getElementById('runBtn').onclick = () => {
     queryAll('.h5p-sc-alternative.h5p-sc-is-correct').forEach(el => forceSelectElement(el));
   };
