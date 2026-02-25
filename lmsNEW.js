@@ -247,6 +247,17 @@
                     })).filter(o=>o.text);
                     if (opts.length) allResults.push({type:'choice',qText,options:opts});
                   }
+                } else if (lib.includes('DragText')) {
+                  const tf = params.textField || '';
+                  const qText = (params.taskDescription||'').replace(/<[^>]+>/g,'').trim();
+                  const matches = [...tf.matchAll(/\*([^*:]+)(?::[^*]*)?\*/g)];
+                  const distractorStr = params.distractors || '';
+                  const distractors = new Set([...distractorStr.matchAll(/\*([^*:]+)(?::[^*]*)?\*/g)].map(m=>m[1].trim()));
+                  const blanks = matches
+                    .map(m=>m[1].trim())
+                    .filter(w=>!distractors.has(w))
+                    .map((w,i)=>({answer:w,globalIndex:i}));
+                  if (blanks.length) allResults.push({type:'drag',qText,textField:tf,blanks,distractors:[...distractors]});
                 }
               });
               if (allResults.length>0) return;
@@ -383,6 +394,39 @@
           if (opts.length) allResults.push({type:'choice', qText, options:opts});
         });
       } catch(e) {}
+      try {
+        doc.querySelectorAll('.h5p-question.h5p-drag-text').forEach(dt => {
+          const qEl = dt.querySelector('.h5p-question-introduction, .h5p-drag-inner');
+          const qText = (qEl ? qEl.innerText : dt.innerText).split('\n')[0].trim();
+          if (!qText) return;
+          const already = allResults.some(r => norm(r.qText).includes(norm(qText.substring(0,20))));
+          if (already) return;
+          const blanks = [];
+          dt.querySelectorAll('.h5p-drag-dropzone-container').forEach((dz,i) => {
+            const sol = dz.querySelector('.h5p-drag-show-solution-container');
+            const ans = sol ? sol.innerText.trim() : '';
+            if (ans) blanks.push({answer:ans, globalIndex:i});
+          });
+          if (!blanks.length) {
+            const win2 = doc.defaultView;
+            if (win2 && win2.H5P && win2.H5P.instances) {
+              win2.H5P.instances.forEach(inst => {
+                if ((inst.libraryInfo?.versionedNameNoSpaces||'').includes('DragText') && inst.params) {
+                  const tf = inst.params.textField || '';
+                  const distStr = inst.params.distractors || '';
+                  const dist = new Set([...distStr.matchAll(/\*([^*:]+)(?::[^*]*)?\*/g)].map(m=>m[1].trim()));
+                  const ms = [...tf.matchAll(/\*([^*:]+)(?::[^*]*)?\*/g)].map(m=>m[1].trim()).filter(w=>!dist.has(w));
+                  ms.forEach((w,i) => blanks.push({answer:w,globalIndex:i}));
+                }
+              });
+            }
+          }
+          if (blanks.length) {
+            const qt = dt.querySelector('[class*="task-description"],[class*="drag-inner"]')?.innerText?.trim() || qText;
+            allResults.push({type:'drag', qText:qt.substring(0,120), blanks});
+          }
+        });
+      } catch(e) {}
     } catch(e) { console.log("Doc err:", e.message); } });
 
     const seen = new Set();
@@ -426,8 +470,27 @@
         }
 
         body += '<div style="font-size:12px;line-height:2;color:#333;">' + previewHtml + '</div>';
+      } else if (q.type === 'drag') {
+        const DRAG_COLORS = [
+          {bg:'#ffff00',bd:'#e6c800',tx:'#5a4a00',glow:'rgba(255,255,0,0.6)'},
+          {bg:'#00ffff',bd:'#00c8c8',tx:'#004a4a',glow:'rgba(0,255,255,0.6)'},
+          {bg:'#00ff88',bd:'#00c86e',tx:'#004a28',glow:'rgba(0,255,136,0.6)'},
+          {bg:'#ff69b4',bd:'#e0408c',tx:'#5a0030',glow:'rgba(255,105,180,0.6)'},
+          {bg:'#bf7fff',bd:'#9340e0',tx:'#3a0060',glow:'rgba(191,127,255,0.6)'},
+          {bg:'#ff9900',bd:'#e07800',tx:'#5a2800',glow:'rgba(255,153,0,0.6)'},
+        ];
+        body += '<div style="font-size:12px;line-height:2.4;color:#333;margin-bottom:6px;">';
+        q.blanks.forEach((b,i) => {
+          const col = DRAG_COLORS[i % DRAG_COLORS.length];
+          body += '<span style="color:#888;font-size:11px;">Ô '+(i+1)+'</span> ' +
+            '<span style="background:'+col.bg+';border:2px solid '+col.bd+';border-radius:6px;padding:2px 10px;color:'+col.tx+';font-weight:900;font-size:12px;margin-right:6px;box-shadow:0 0 8px 2px '+col.glow+';">' +
+            b.answer + '</span>';
+        });
+        body += '</div>';
+        if (q.distractors && q.distractors.length) {
+          body += '<div style="font-size:11px;color:#bbb;margin-top:2px;">Nhiễu: ' + q.distractors.join(' · ') + '</div>';
+        }
       }
-
       const cleanTitle = (q.qText || '').replace(/\*[^*]+\*/g, '___').trim();
       const titlePreview = cleanTitle.length > 60 ? cleanTitle.substring(0, 60) + '...' : cleanTitle;
       html += '<div class="q-box"><div class="q-title">Câu ' + (idx+1) + ': ' + titlePreview + '</div>' + body + '</div>';
@@ -799,6 +862,14 @@
         el.style.background = (isSmartHighlight && isCorrect) ? 'rgba(0,230,118,0.15)' : '';
       });
       
+      const DRAG_COLORS = [
+        {bg:'#ffff00',bd:'#e6c800',tx:'#5a4a00',glow:'rgba(255,255,0,0.7)'},
+        {bg:'#00ffff',bd:'#00c8c8',tx:'#004a4a',glow:'rgba(0,255,255,0.7)'},
+        {bg:'#00ff88',bd:'#00c86e',tx:'#004a28',glow:'rgba(0,255,136,0.7)'},
+        {bg:'#ff69b4',bd:'#e0408c',tx:'#5a0030',glow:'rgba(255,105,180,0.7)'},
+        {bg:'#bf7fff',bd:'#9340e0',tx:'#3a0060',glow:'rgba(191,127,255,0.7)'},
+        {bg:'#ff9900',bd:'#e07800',tx:'#5a2800',glow:'rgba(255,153,0,0.7)'},
+      ];
       if (isSmartHighlight) {
         const allInputs = Array.from(doc.querySelectorAll('input.h5p-text-input'));
         const fillQs = allResults.filter(q => q.type === 'fill');
@@ -811,10 +882,76 @@
             fillInput(inp, b.answer);
           });
         });
+        const dragQs = allResults.filter(q => q.type === 'drag');
+        dragQs.forEach(dq => {
+          const dropzones = Array.from(doc.querySelectorAll('.h5p-drag-dropzone-container'));
+          const draggables = Array.from(doc.querySelectorAll('.h5p-drag-draggables-container .ui-draggable'));
+          const normDrag = el => {
+            const t = (el.innerText || el.textContent || '').split('\n')[0].trim().toLowerCase();
+            return t;
+          };
+          dq.blanks.forEach((b, i) => {
+            const col = DRAG_COLORS[i % DRAG_COLORS.length];
+            const dz = dropzones[i];
+            if (dz) {
+              dz.style.outline = '3px solid ' + col.bd;
+              dz.style.background = col.bg;
+              dz.style.borderRadius = '6px';
+              dz.style.boxShadow = '0 0 10px 3px ' + col.glow;
+              const dzInner = dz.querySelector('.ui-droppable');
+              if (dzInner) {
+                dzInner.style.outline = '3px solid ' + col.bd;
+                dzInner.style.background = col.bg;
+                dzInner.style.boxShadow = '0 0 10px 3px ' + col.glow;
+              }
+              const label = document.createElement('span');
+              label.className = '_drag_lbl_';
+              label.style.cssText = 'position:absolute;top:-12px;left:2px;font-size:9px;font-weight:900;background:'+col.bd+';color:#fff;border-radius:3px;padding:0 4px;z-index:99;pointer-events:none;';
+              label.textContent = 'Ô'+(i+1);
+              dz.style.position = 'relative';
+              dz.appendChild(label);
+            }
+            const drag = draggables.find(el => normDrag(el) === norm(b.answer));
+            if (drag) {
+              drag.style.outline = '3px solid ' + col.bd;
+              drag.style.background = col.bg;
+              drag.style.color = col.tx;
+              drag.style.fontWeight = '900';
+              drag.style.borderRadius = '8px';
+              drag.style.boxShadow = '0 0 16px 5px ' + col.glow + ', inset 0 0 0 2px ' + col.bd;
+              drag.style.transform = 'scale(1.06)';
+              drag.style.transition = 'all 0.2s';
+              drag.style.zIndex = '5';
+            }
+          });
+          // Làm mờ các từ nhiễu
+          const correctWords = new Set(dq.blanks.map(b => norm(b.answer)));
+          draggables.forEach(el => {
+            if (!correctWords.has(normDrag(el))) {
+              el.style.opacity = '0.35';
+              el.style.filter = 'grayscale(60%)';
+            }
+          });
+        });
       } else {
         doc.querySelectorAll('input.h5p-text-input').forEach(inp => {
           inp.style.outline = '';
           inp.style.background = '';
+        });
+        doc.querySelectorAll('.h5p-drag-dropzone-container,.ui-draggable').forEach(el => {
+          el.style.outline = '';
+          el.style.background = '';
+          el.style.color = '';
+          el.style.fontWeight = '';
+          el.style.borderRadius = '';
+          el.style.boxShadow = '';
+        });
+        doc.querySelectorAll('._drag_lbl_').forEach(el => el.remove());
+        doc.querySelectorAll('.ui-droppable').forEach(el => {
+          el.style.outline = ''; el.style.background = ''; el.style.boxShadow = '';
+        });
+        doc.querySelectorAll('.h5p-drag-draggables-container .ui-draggable').forEach(el => {
+          el.style.opacity = ''; el.style.filter = ''; el.style.transform = ''; el.style.transition = ''; el.style.zIndex = '';
         });
       }
     });
