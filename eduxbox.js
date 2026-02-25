@@ -1,3 +1,4 @@
+// this is suck
 (() => {
   if (document.getElementById('eduxWrap')) return;
 
@@ -125,16 +126,39 @@
     }
   }
 
+  async function waitForNewProblem(oldId, timeout=8000) {
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+      await sleep(300);
+      const cur = document.querySelector('[id^="inputtype_"]')?.id || '';
+      if (cur && cur !== oldId) return true;
+    }
+    return false;
+  }
+
+  async function waitForContainer(timeout=12000) {
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+      const el = Array.from(document.querySelectorAll('[id^="inputtype_"]')).find(e => e.id.includes('_2_1'));
+      if (el && el.querySelector('fieldset')) return el;
+      await sleep(400);
+    }
+    return null;
+  }
+
   async function clickNext() {
     const span = Array.from(document.querySelectorAll('span.sequence-nav-button-label'))
       .find(el => el.textContent.trim().toUpperCase()==='NEXT');
     if (span) {
       const btn = span.closest('button')||span;
       btn.scrollIntoView({behavior:'smooth',block:'center'});
-      await sleep(500); simulateClick(btn);
+      await sleep(400);
+      const oldId = document.querySelector('[id^="inputtype_"]')?.id || '';
+      simulateClick(btn);
       addLog('Chuyển bài tiếp...','g');
       if (document.getElementById('eLoopToggle').checked) {
-        await sleep(1200);
+        const ok = await waitForNewProblem(oldId, 8000);
+        if (!ok) addLog('Timeout chờ bài mới','y');
         if (running) autoRun();
       }
     } else {
@@ -179,8 +203,9 @@
     const correctSpanCheck = document.querySelector('[id^="inputtype_"]')?.querySelector('span.status.correct');
     if (correctSpanCheck) { addLog('Đã đúng - next','g'); await clickNext(); return; }
 
-    const container = Array.from(document.querySelectorAll('[id^="inputtype_"]')).find(el=>el.id.includes('_2_1'));
-    if (!container) { addLog('Không tìm thấy container','r'); return; }
+    addLog('Chờ câu hỏi load...','b');
+    const container = await waitForContainer(12000);
+    if (!container) { addLog('Không tìm thấy container (timeout)','r'); return; }
 
     const fieldset = container.querySelector('fieldset');
     if (!fieldset) { addLog('Không tìm thấy fieldset','r'); return; }
