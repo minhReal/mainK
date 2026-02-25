@@ -165,6 +165,24 @@
     };
   }
 
+  function h5pMarkTheWordsParseAnswers(tf) {
+    // Dùng đúng algorithm H5P word.js: chỉ *word* liền (ko space trước *) mới là đáp án
+    const text = tf.replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ');
+    const tokens = text.match(/ \*[^ *]+\* |[^\s]+/g) || [];
+    const answers = [];
+    tokens.forEach(tok => {
+      tok = tok.trim();
+      if (tok.charAt(0) === '*' && tok.length > 2) {
+        if (tok.charAt(tok.length-1) === '*') {
+          answers.push(tok.slice(1,-1).trim());
+        } else if (tok.charAt(tok.length-2) === '*') {
+          answers.push(tok.slice(1,-2).trim());
+        }
+      }
+    });
+    return answers.filter(Boolean);
+  }
+
   function hackLmsDirect() {
     const lmsOutput = document.getElementById('lmsResponse');
     lmsOutput.innerHTML = '<i>Đang setup...</i>';
@@ -247,6 +265,11 @@
                     })).filter(o=>o.text);
                     if (opts.length) allResults.push({type:'choice',qText,options:opts});
                   }
+                } else if (lib.includes('MarkTheWords')) {
+                  const tf = params.textField || '';
+                  const qText = (params.taskDescription||'').replace(/<[^>]+>/g,'').trim();
+                  const answers = h5pMarkTheWordsParseAnswers(tf);
+                  if (answers.length) allResults.push({type:'mark', qText, answers});
                 } else if (lib.includes('DragText')) {
                   const tf = params.textField || '';
                   const qText = (params.taskDescription||'').replace(/<[^>]+>/g,'').trim();
@@ -261,6 +284,25 @@
                 }
               });
               if (allResults.length>0) return;
+            }
+
+            if (p.textField && typeof p.textField === 'string' && !p.interactiveVideo) {
+              const tf = p.textField;
+              const qText = (p.taskDescription||'').replace(/<[^>]+>/g,'').trim();
+              // DragText có distractors, MarkTheWords thì không
+              if (typeof p.distractors !== 'undefined') {
+                // DragText
+                const distStr = p.distractors || '';
+                const distractors = new Set([...distStr.matchAll(/\*([^*:]+)(?::[^*]*)?\*/g)].map(m=>m[1].trim()));
+                const matches = [...tf.matchAll(/\*([^*:]+)(?::[^*]*)?\*/g)];
+                const blanks = matches.map(m=>m[1].trim()).filter(w=>!distractors.has(w)).map((w,i)=>({answer:w,globalIndex:i}));
+                if (blanks.length) allResults.push({type:'drag',qText:qText||'DragText',textField:tf,blanks,distractors:[...distractors]});
+              } else {
+                // MarkTheWords
+                const answers = h5pMarkTheWordsParseAnswers(tf);
+                if (answers.length) allResults.push({type:'mark', qText:qText||'Mark the Words', answers});
+              }
+              return;
             }
 
             if (p.questions && Array.isArray(p.questions) && typeof p.questions[0] === 'string') {
@@ -395,6 +437,35 @@
         });
       } catch(e) {}
       try {
+        doc.querySelectorAll('.h5p-question.h5p-mark-the-words').forEach(mtw => {
+          const qEl = mtw.querySelector('.h5p-question-introduction');
+          const qText = (qEl ? qEl.innerText : '').trim() || 'Mark the Words';
+          const already = allResults.some(r => norm(r.qText).includes(norm(qText.substring(0,20))));
+          if (already) return;
+          const answers = [];
+          const win2 = mtw.ownerDocument.defaultView;
+          // Ưu tiên dùng selectableWords từ H5P instance (chính xác nhất)
+          if (win2 && win2.H5P && win2.H5P.instances) {
+            win2.H5P.instances.forEach(inst => {
+              if ((inst.libraryInfo?.versionedNameNoSpaces||'').includes('MarkTheWords')) {
+                if (inst.selectableWords && inst.selectableWords.length) {
+                  inst.selectableWords.forEach(w => {
+                    if (w.isAnswer && w.isAnswer()) {
+                      const text = (w.$word ? w.$word.text() : '').trim();
+                      if (text) answers.push(text);
+                    }
+                  });
+                } else if (inst.params?.textField) {
+                  const tf = inst.params.textField;
+                  h5pMarkTheWordsParseAnswers(tf).forEach(a => answers.push(a));
+                }
+              }
+            });
+          }
+          if (answers.length) allResults.push({type:'mark', qText, answers});
+        });
+      } catch(e) {}
+      try {
         doc.querySelectorAll('.h5p-question.h5p-drag-text').forEach(dt => {
           const qEl = dt.querySelector('.h5p-question-introduction, .h5p-drag-inner');
           const qText = (qEl ? qEl.innerText : dt.innerText).split('\n')[0].trim();
@@ -470,6 +541,13 @@
         }
 
         body += '<div style="font-size:12px;line-height:2;color:#333;">' + previewHtml + '</div>';
+      } else if (q.type === 'mark') {
+        body += '<div style="font-size:12px;line-height:2;color:#333;">';
+        q.answers.forEach((a, ai) => {
+          body += '<span style="color:#666;font-size:10px;">'+(ai+1)+'.</span> ' +
+            '<span style="background:#00ff88;border:2px solid #00c86e;border-radius:6px;padding:1px 9px;color:#004a28;font-weight:900;font-size:12px;margin-right:8px;box-shadow:0 0 8px 2px rgba(0,255,136,0.6);">' + a.trim() + '</span>';
+        });
+        body += '</div>';
       } else if (q.type === 'drag') {
         const DRAG_COLORS = [
           {bg:'#ffff00',bd:'#e6c800',tx:'#5a4a00',glow:'rgba(255,255,0,0.6)'},
@@ -594,6 +672,39 @@
       }, delay);
       delay += 1000;
     });
+
+    // MarkTheWords: auto click đúng từ
+    const markQs = confirmedQuestions.filter(q => q.type === 'mark');
+    if (markQs.length) {
+      setTimeout(() => {
+        allDocs.forEach(doc => {
+          markQs.forEach(mq => {
+            const correctSet = new Set(mq.answers.map(a => a.toLowerCase().trim()));
+            const spans = Array.from(doc.querySelectorAll('.h5p-word-selectable-words span:not(.hidden-but-read)'));
+            let si = 0;
+            while (si < spans.length) {
+              const sp = spans[si];
+              const raw = sp.innerText.trim();
+              if (raw.startsWith('*') && raw !== '*') {
+                const word = raw.replace(/^\*+/, '').replace(/\*+$/, '').trim();
+                if (correctSet.has(word.toLowerCase())) {
+                  const iWin = sp.ownerDocument.defaultView;
+                  ['mousedown','mouseup','click'].forEach(ev =>
+                    sp.dispatchEvent(new iWin.MouseEvent(ev, {bubbles:true, cancelable:true}))
+                  );
+                }
+              }
+              si++;
+            }
+            // Bấm Kiểm tra
+            setTimeout(() => {
+              const checkBtn = doc.querySelector('.h5p-question-check-answer');
+              if (checkBtn) checkBtn.click();
+            }, 600);
+          });
+        });
+      }, delay);
+    }
   }
 
   function executeFillBlanks() {
@@ -883,53 +994,70 @@
           });
         });
         const dragQs = allResults.filter(q => q.type === 'drag');
+        const DC = [
+          {bg:'#ffff00',bd:'#ccbb00',tx:'#333',glow:'rgba(255,255,0,0.7)'},
+          {bg:'#00ffff',bd:'#00aaaa',tx:'#003333',glow:'rgba(0,255,255,0.7)'},
+          {bg:'#ff69b4',bd:'#cc2277',tx:'#fff',glow:'rgba(255,105,180,0.7)'},
+          {bg:'#00ff88',bd:'#00aa55',tx:'#003322',glow:'rgba(0,255,136,0.7)'},
+          {bg:'#ff9900',bd:'#cc6600',tx:'#fff',glow:'rgba(255,153,0,0.7)'},
+          {bg:'#bf7fff',bd:'#8833cc',tx:'#fff',glow:'rgba(191,127,255,0.7)'},
+          {bg:'#ff4444',bd:'#cc0000',tx:'#fff',glow:'rgba(255,68,68,0.7)'},
+          {bg:'#44ddff',bd:'#0099cc',tx:'#003344',glow:'rgba(68,221,255,0.7)'},
+          {bg:'#aaffaa',bd:'#33bb33',tx:'#003300',glow:'rgba(170,255,170,0.7)'},
+          {bg:'#ffaaff',bd:'#cc33cc',tx:'#330033',glow:'rgba(255,170,255,0.7)'},
+          {bg:'#ffdd44',bd:'#bb9900',tx:'#333',glow:'rgba(255,221,68,0.7)'},
+          {bg:'#44ffee',bd:'#00bbaa',tx:'#003333',glow:'rgba(68,255,238,0.7)'},
+        ];
         dragQs.forEach(dq => {
           const dropzones = Array.from(doc.querySelectorAll('.h5p-drag-dropzone-container'));
           const draggables = Array.from(doc.querySelectorAll('.h5p-drag-draggables-container .ui-draggable'));
           const normDrag = el => {
-            const t = (el.innerText || el.textContent || '').split('\n')[0].trim().toLowerCase();
-            return t;
+            const sp = el.querySelector('span:not(.h5p-hidden-read)');
+            return (sp ? sp.innerText : (el.innerText||'')).split('\n')[0].trim().toLowerCase();
           };
-          dq.blanks.forEach((b, i) => {
-            const col = DRAG_COLORS[i % DRAG_COLORS.length];
-            const dz = dropzones[i];
-            if (dz) {
-              dz.style.outline = '3px solid ' + col.bd;
-              dz.style.background = col.bg;
-              dz.style.borderRadius = '6px';
-              dz.style.boxShadow = '0 0 10px 3px ' + col.glow;
-              const dzInner = dz.querySelector('.ui-droppable');
-              if (dzInner) {
-                dzInner.style.outline = '3px solid ' + col.bd;
-                dzInner.style.background = col.bg;
-                dzInner.style.boxShadow = '0 0 10px 3px ' + col.glow;
-              }
-              const label = document.createElement('span');
-              label.className = '_drag_lbl_';
-              label.style.cssText = 'position:absolute;top:-12px;left:2px;font-size:9px;font-weight:900;background:'+col.bd+';color:#fff;border-radius:3px;padding:0 4px;z-index:99;pointer-events:none;';
-              label.textContent = 'Ô'+(i+1);
-              dz.style.position = 'relative';
-              dz.appendChild(label);
-            }
-            const drag = draggables.find(el => normDrag(el) === norm(b.answer));
-            if (drag) {
-              drag.style.outline = '3px solid ' + col.bd;
-              drag.style.background = col.bg;
-              drag.style.color = col.tx;
-              drag.style.fontWeight = '900';
-              drag.style.borderRadius = '8px';
-              drag.style.boxShadow = '0 0 16px 5px ' + col.glow + ', inset 0 0 0 2px ' + col.bd;
-              drag.style.transform = 'scale(1.06)';
-              drag.style.transition = 'all 0.2s';
-              drag.style.zIndex = '5';
+          // Map từng đáp án -> màu riêng
+          const wordColorMap = {};
+          dq.blanks.forEach((b, i) => { wordColorMap[norm(b.answer)] = DC[i % DC.length]; });
+          const correctWords = new Set(Object.keys(wordColorMap));
+          // Highlight ô trống
+          dropzones.forEach((dzContainer, i) => {
+            const dz = dzContainer.querySelector('.ui-droppable');
+            const col = DC[i % DC.length];
+            if (isSmartHighlight) {
+              if (dz) { dz.style.outline='3px solid '+col.bd; dz.style.background=col.bg; dz.style.boxShadow='0 0 12px 4px '+col.glow; dz.style.borderRadius='6px'; }
+              const lbl = document.createElement('span');
+              lbl.className='_drag_lbl_';
+              lbl.style.cssText='position:absolute;top:-16px;left:2px;font-size:9px;font-weight:900;background:'+col.bd+';color:'+col.tx+';border-radius:3px;padding:0 5px;z-index:99;pointer-events:none;white-space:nowrap;';
+              lbl.textContent='Ô'+(i+1)+': '+(dq.blanks[i]?dq.blanks[i].answer:'?');
+              dzContainer.style.position='relative';
+              dzContainer.appendChild(lbl);
+            } else {
+              if (dz) { dz.style.outline=''; dz.style.background=''; dz.style.boxShadow=''; dz.style.borderRadius=''; }
             }
           });
-          // Làm mờ các từ nhiễu
-          const correctWords = new Set(dq.blanks.map(b => norm(b.answer)));
+          // Highlight từ đúng với đúng màu / mờ từ sai
           draggables.forEach(el => {
-            if (!correctWords.has(normDrag(el))) {
-              el.style.opacity = '0.35';
-              el.style.filter = 'grayscale(60%)';
+            const w = normDrag(el);
+            const col = wordColorMap[w];
+            if (isSmartHighlight) {
+              if (col) {
+                el.style.outline='3px solid '+col.bd;
+                el.style.background=col.bg;
+                el.style.color=col.tx;
+                el.style.boxShadow='0 0 14px 5px '+col.glow;
+                el.style.fontWeight='900';
+                el.style.borderRadius='6px';
+                el.style.opacity='1';
+                el.style.filter='none';
+              } else {
+                el.style.outline=''; el.style.background=''; el.style.color='';
+                el.style.boxShadow=''; el.style.fontWeight=''; el.style.borderRadius='';
+                el.style.opacity='0.28'; el.style.filter='grayscale(80%)';
+              }
+            } else {
+              el.style.outline=''; el.style.background=''; el.style.color='';
+              el.style.boxShadow=''; el.style.fontWeight=''; el.style.borderRadius='';
+              el.style.opacity=''; el.style.filter='';
             }
           });
         });
@@ -938,13 +1066,49 @@
           inp.style.outline = '';
           inp.style.background = '';
         });
-        doc.querySelectorAll('.h5p-drag-dropzone-container,.ui-draggable').forEach(el => {
+        doc.querySelectorAll('.h5p-drag-dropzone-container .ui-droppable,.ui-draggable').forEach(el => {
           el.style.outline = '';
           el.style.background = '';
           el.style.color = '';
           el.style.fontWeight = '';
           el.style.borderRadius = '';
           el.style.boxShadow = '';
+        });
+        const markQs = allResults.filter(q => q.type === 'mark');
+        markQs.forEach(mq => {
+          const applyHL = (sp, on) => {
+            sp.style.background   = on ? '#00ff88' : '';
+            sp.style.outline      = on ? '2px solid #00c86e' : '';
+            sp.style.borderRadius = on ? '5px' : '';
+            sp.style.fontWeight   = on ? '900' : '';
+            sp.style.boxShadow    = on ? '0 0 12px 4px rgba(0,255,136,0.75)' : '';
+            sp.style.color        = on ? '#004a28' : '';
+            sp.style.padding      = on ? '0 3px' : '';
+          };
+          const win3 = doc.defaultView;
+          let marked = false;
+          if (win3 && win3.H5P && win3.H5P.instances) {
+            win3.H5P.instances.forEach(inst => {
+              if (!(inst.libraryInfo?.versionedNameNoSpaces||'').includes('MarkTheWords')) return;
+              if (!inst.selectableWords) return;
+              // span DOM và selectableWords tương ứng 1:1 theo index
+              const spans = Array.from(doc.querySelectorAll('span[role="option"]'));
+              inst.selectableWords.forEach((w, wi) => {
+                const sp = spans[wi];
+                if (!sp) return;
+                applyHL(sp, isSmartHighlight && w.isAnswer());
+              });
+              marked = true;
+            });
+          }
+          if (!marked) {
+            const answerSet = new Set(mq.answers.map(a => a.toLowerCase()));
+            const spans = Array.from(doc.querySelectorAll('.h5p-word-selectable-words span:not(.hidden-but-read)'));
+            spans.forEach(sp => {
+              const t = (sp.innerText||'').trim().toLowerCase();
+              applyHL(sp, isSmartHighlight && answerSet.has(t));
+            });
+          }
         });
         doc.querySelectorAll('._drag_lbl_').forEach(el => el.remove());
         doc.querySelectorAll('.ui-droppable').forEach(el => {
