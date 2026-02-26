@@ -283,7 +283,7 @@
                   if (blanks.length) allResults.push({type:'drag',qText,textField:tf,blanks,distractors:[...distractors]});
                 }
               });
-              if (allResults.length>0) return;
+              if (allResults.length>0 && !allResults.every(r=>r.type==='mark')) return;
             }
 
             if (p.textField && typeof p.textField === 'string' && !p.interactiveVideo) {
@@ -436,6 +436,29 @@
           if (opts.length) allResults.push({type:'choice', qText, options:opts});
         });
       } catch(e) {}
+      // Parse DragText từ H5P.instances trực tiếp (bắt tất cả embed style)
+      try {
+        const win2 = doc.defaultView;
+        if (win2 && win2.H5P && win2.H5P.instances) {
+          win2.H5P.instances.forEach(inst => {
+            const lib = inst.libraryInfo?.versionedNameNoSpaces || '';
+            if (!lib.includes('DragText')) return;
+            if (!inst.params?.textField) return;
+            const already = allResults.some(r => r.type === 'drag');
+            if (already) return;
+            const tf = inst.params.textField;
+            const qText = (inst.params.taskDescription||'').replace(/<[^>]+>/g,'').trim() || 'DragText';
+            const distStr = inst.params.distractors || '';
+            const dist = new Set([...distStr.matchAll(/\*([^*:]+)(?::[^*]*)?\*/g)].map(m=>m[1].trim()));
+            const ms = [...tf.matchAll(/\*([^*:]+)(?::[^*]*)?\*/g)];
+            const blanks = ms.map(m=>m[1].trim()).filter(w=>!dist.has(w)).map((w,i)=>({answer:w,globalIndex:i}));
+            if (blanks.length) {
+              allResults.push({type:'drag', qText, textField:tf, blanks, distractors:[...dist]});
+            } else {
+            }
+          });
+        }
+      } catch(e) {}
       try {
         doc.querySelectorAll('.h5p-question.h5p-mark-the-words').forEach(mtw => {
           const qEl = mtw.querySelector('.h5p-question-introduction');
@@ -502,7 +525,7 @@
 
     const seen = new Set();
     allResults = allResults.filter(r => {
-      const key = r.qText.substring(0,30);
+      const key = r.type + '|' + r.qText.substring(0,30);
       if (seen.has(key)) return false;
       seen.add(key); return true;
     });
@@ -571,7 +594,12 @@
       }
       const cleanTitle = (q.qText || '').replace(/\*[^*]+\*/g, '___').trim();
       const titlePreview = cleanTitle.length > 60 ? cleanTitle.substring(0, 60) + '...' : cleanTitle;
-      html += '<div class="q-box"><div class="q-title">Câu ' + (idx+1) + ': ' + titlePreview + '</div>' + body + '</div>';
+      const typeBadge = q.type === 'drag' ? '<span style="background:#FF8C00;color:#fff;font-size:9px;font-weight:900;border-radius:3px;padding:1px 5px;margin-left:4px;">KÉO THẢ</span>'
+        : q.type === 'mark' ? '<span style="background:#9370DB;color:#fff;font-size:9px;font-weight:900;border-radius:3px;padding:1px 5px;margin-left:4px;">ĐÁNH DẤU</span>'
+        : q.type === 'fill' ? '<span style="background:#20B2AA;color:#fff;font-size:9px;font-weight:900;border-radius:3px;padding:1px 5px;margin-left:4px;">ĐIỀN CHỖ TRỐNG</span>'
+        : q.type === 'choice' ? '<span style="background:#4169E1;color:#fff;font-size:9px;font-weight:900;border-radius:3px;padding:1px 5px;margin-left:4px;">CHỌN ĐÁP ÁN</span>'
+        : '';
+      html += '<div class="q-box"><div class="q-title">Câu ' + (idx+1) + ': ' + titlePreview + typeBadge + '</div>' + body + '</div>';
     });
 
     lmsOutput.innerHTML = html;
@@ -994,95 +1022,175 @@
           });
         });
         const dragQs = allResults.filter(q => q.type === 'drag');
-        const DC = [
-          {bg:'#ffff00',bd:'#ccbb00',tx:'#333',glow:'rgba(255,255,0,0.7)'},
-          {bg:'#00ffff',bd:'#00aaaa',tx:'#003333',glow:'rgba(0,255,255,0.7)'},
-          {bg:'#ff69b4',bd:'#cc2277',tx:'#fff',glow:'rgba(255,105,180,0.7)'},
-          {bg:'#00ff88',bd:'#00aa55',tx:'#003322',glow:'rgba(0,255,136,0.7)'},
-          {bg:'#ff9900',bd:'#cc6600',tx:'#fff',glow:'rgba(255,153,0,0.7)'},
-          {bg:'#bf7fff',bd:'#8833cc',tx:'#fff',glow:'rgba(191,127,255,0.7)'},
-          {bg:'#ff4444',bd:'#cc0000',tx:'#fff',glow:'rgba(255,68,68,0.7)'},
-          {bg:'#44ddff',bd:'#0099cc',tx:'#003344',glow:'rgba(68,221,255,0.7)'},
-          {bg:'#aaffaa',bd:'#33bb33',tx:'#003300',glow:'rgba(170,255,170,0.7)'},
-          {bg:'#ffaaff',bd:'#cc33cc',tx:'#330033',glow:'rgba(255,170,255,0.7)'},
-          {bg:'#ffdd44',bd:'#bb9900',tx:'#333',glow:'rgba(255,221,68,0.7)'},
-          {bg:'#44ffee',bd:'#00bbaa',tx:'#003333',glow:'rgba(68,255,238,0.7)'},
-        ];
-        dragQs.forEach(dq => {
-          const dropzones = Array.from(doc.querySelectorAll('.h5p-drag-dropzone-container'));
-          const draggables = Array.from(doc.querySelectorAll('.h5p-drag-draggables-container .ui-draggable'));
-          const normDrag = el => {
-            const sp = el.querySelector('span:not(.h5p-hidden-read)');
-            return (sp ? sp.innerText : (el.innerText||'')).split('\n')[0].trim().toLowerCase();
-          };
-          // Map từng đáp án -> màu riêng
-          const wordColorMap = {};
-          dq.blanks.forEach((b, i) => { wordColorMap[norm(b.answer)] = DC[i % DC.length]; });
-          const correctWords = new Set(Object.keys(wordColorMap));
-          // Highlight ô trống
-          dropzones.forEach((dzContainer, i) => {
-            const dz = dzContainer.querySelector('.ui-droppable');
-            const col = DC[i % DC.length];
-            if (isSmartHighlight) {
-              if (dz) { dz.style.outline='3px solid '+col.bd; dz.style.background=col.bg; dz.style.boxShadow='0 0 12px 4px '+col.glow; dz.style.borderRadius='6px'; }
-              const lbl = document.createElement('span');
-              lbl.className='_drag_lbl_';
-              lbl.style.cssText='position:absolute;top:-16px;left:2px;font-size:9px;font-weight:900;background:'+col.bd+';color:'+col.tx+';border-radius:3px;padding:0 5px;z-index:99;pointer-events:none;white-space:nowrap;';
-              lbl.textContent='Ô'+(i+1)+': '+(dq.blanks[i]?dq.blanks[i].answer:'?');
-              dzContainer.style.position='relative';
-              dzContainer.appendChild(lbl);
-            } else {
-              if (dz) { dz.style.outline=''; dz.style.background=''; dz.style.boxShadow=''; dz.style.borderRadius=''; }
+        const DC=[
+          {bg:'#FFD700',bd:'#B8860B',tx:'#333',glow:'rgba(255,215,0,0.6)'},
+          {bg:'#FFA500',bd:'#CC6600',tx:'#333',glow:'rgba(255,165,0,0.6)'},
+          {bg:'#FF8C00',bd:'#CC5500',tx:'#fff',glow:'rgba(255,140,0,0.6)'},
+          {bg:'#FF6347',bd:'#CC2200',tx:'#fff',glow:'rgba(255,99,71,0.6)'},
+          {bg:'#FF4500',bd:'#CC1100',tx:'#fff',glow:'rgba(255,69,0,0.6)'},
+          {bg:'#FF69B4',bd:'#CC1177',tx:'#fff',glow:'rgba(255,105,180,0.6)'},
+          {bg:'#FF1493',bd:'#CC0066',tx:'#fff',glow:'rgba(255,20,147,0.6)'},
+          {bg:'#DB7093',bd:'#AA2255',tx:'#fff',glow:'rgba(219,112,147,0.6)'},
+          {bg:'#C71585',bd:'#880033',tx:'#fff',glow:'rgba(199,21,133,0.6)'},
+          {bg:'#DC143C',bd:'#AA0022',tx:'#fff',glow:'rgba(220,20,60,0.6)'},
+          {bg:'#9370DB',bd:'#5500AA',tx:'#fff',glow:'rgba(147,112,219,0.6)'},
+          {bg:'#8A2BE2',bd:'#5500BB',tx:'#fff',glow:'rgba(138,43,226,0.6)'},
+          {bg:'#7B68EE',bd:'#3300CC',tx:'#fff',glow:'rgba(123,104,238,0.6)'},
+          {bg:'#6A5ACD',bd:'#3300AA',tx:'#fff',glow:'rgba(106,90,205,0.6)'},
+          {bg:'#9932CC',bd:'#6600AA',tx:'#fff',glow:'rgba(153,50,204,0.6)'},
+          {bg:'#8B008B',bd:'#550055',tx:'#fff',glow:'rgba(139,0,139,0.6)'},
+          {bg:'#4B0082',bd:'#220044',tx:'#fff',glow:'rgba(75,0,130,0.6)'},
+          {bg:'#1E90FF',bd:'#0055CC',tx:'#fff',glow:'rgba(30,144,255,0.6)'},
+          {bg:'#4169E1',bd:'#1133AA',tx:'#fff',glow:'rgba(65,105,225,0.6)'},
+          {bg:'#0000CD',bd:'#000088',tx:'#fff',glow:'rgba(0,0,205,0.6)'},
+          {bg:'#00BFFF',bd:'#0088BB',tx:'#333',glow:'rgba(0,191,255,0.6)'},
+          {bg:'#87CEEB',bd:'#2277AA',tx:'#333',glow:'rgba(135,206,235,0.6)'},
+          {bg:'#4682B4',bd:'#1144AA',tx:'#fff',glow:'rgba(70,130,180,0.6)'},
+          {bg:'#00CED1',bd:'#007788',tx:'#fff',glow:'rgba(0,206,209,0.6)'},
+          {bg:'#20B2AA',bd:'#006655',tx:'#fff',glow:'rgba(32,178,170,0.6)'},
+          {bg:'#008B8B',bd:'#005555',tx:'#fff',glow:'rgba(0,139,139,0.6)'},
+          {bg:'#00FA9A',bd:'#006633',tx:'#333',glow:'rgba(0,250,154,0.6)'},
+          {bg:'#3CB371',bd:'#115533',tx:'#fff',glow:'rgba(60,179,113,0.6)'},
+          {bg:'#32CD32',bd:'#116611',tx:'#fff',glow:'rgba(50,205,50,0.6)'},
+          {bg:'#228B22',bd:'#114411',tx:'#fff',glow:'rgba(34,139,34,0.6)'},
+          {bg:'#006400',bd:'#003300',tx:'#fff',glow:'rgba(0,100,0,0.6)'},
+          {bg:'#ADFF2F',bd:'#779900',tx:'#333',glow:'rgba(173,255,47,0.6)'},
+          {bg:'#7FFF00',bd:'#559900',tx:'#333',glow:'rgba(127,255,0,0.6)'},
+          {bg:'#66CDAA',bd:'#228866',tx:'#333',glow:'rgba(102,205,170,0.6)'},
+          {bg:'#D2691E',bd:'#884400',tx:'#fff',glow:'rgba(210,105,30,0.6)'},
+          {bg:'#CD853F',bd:'#886622',tx:'#fff',glow:'rgba(205,133,63,0.6)'},
+          {bg:'#8B4513',bd:'#552200',tx:'#fff',glow:'rgba(139,69,19,0.6)'},
+          {bg:'#A0522D',bd:'#663300',tx:'#fff',glow:'rgba(160,82,45,0.6)'},
+          {bg:'#DEB887',bd:'#996633',tx:'#333',glow:'rgba(222,184,135,0.6)'},
+          {bg:'#708090',bd:'#334455',tx:'#fff',glow:'rgba(112,128,144,0.6)'},
+          {bg:'#2F4F4F',bd:'#113333',tx:'#fff',glow:'rgba(47,79,79,0.6)'},
+          {bg:'#696969',bd:'#333333',tx:'#fff',glow:'rgba(105,105,105,0.6)'},
+          {bg:'#778899',bd:'#334455',tx:'#fff',glow:'rgba(119,136,153,0.6)'},
+          {bg:'#FF7F50',bd:'#CC3300',tx:'#fff',glow:'rgba(255,127,80,0.6)'},
+          {bg:'#FA8072',bd:'#CC2211',tx:'#fff',glow:'rgba(250,128,114,0.6)'},
+          {bg:'#E9967A',bd:'#AA4422',tx:'#fff',glow:'rgba(233,150,122,0.6)'},
+          {bg:'#F08080',bd:'#CC2222',tx:'#fff',glow:'rgba(240,128,128,0.6)'},
+          {bg:'#FFA07A',bd:'#CC5533',tx:'#333',glow:'rgba(255,160,122,0.6)'},
+          {bg:'#5F9EA0',bd:'#226677',tx:'#fff',glow:'rgba(95,158,160,0.6)'},
+          {bg:'#B0C4DE',bd:'#4466AA',tx:'#333',glow:'rgba(176,196,222,0.6)'},
+          {bg:'#ADD8E6',bd:'#3377AA',tx:'#333',glow:'rgba(173,216,230,0.6)'},
+          {bg:'#87CEFA',bd:'#2266AA',tx:'#333',glow:'rgba(135,206,250,0.6)'},
+          {bg:'#BC8F8F',bd:'#774444',tx:'#fff',glow:'rgba(188,143,143,0.6)'},
+          {bg:'#F4A460',bd:'#AA5500',tx:'#333',glow:'rgba(244,164,96,0.6)'},
+          {bg:'#DAA520',bd:'#886600',tx:'#333',glow:'rgba(218,165,32,0.6)'},
+          {bg:'#B8860B',bd:'#664400',tx:'#fff',glow:'rgba(184,134,11,0.6)'},
+          {bg:'#FF00FF',bd:'#AA00AA',tx:'#fff',glow:'rgba(255,0,255,0.6)'},
+          {bg:'#00FF7F',bd:'#007733',tx:'#333',glow:'rgba(0,255,127,0.6)'},
+          {bg:'#7FFFD4',bd:'#228866',tx:'#333',glow:'rgba(127,255,212,0.6)'},
+          {bg:'#FFDAB9',bd:'#BB8844',tx:'#333',glow:'rgba(255,218,185,0.6)'},
+          {bg:'#E6E6FA',bd:'#5555AA',tx:'#333',glow:'rgba(230,230,250,0.6)'},
+        ];        // Dùng H5P.instances trực tiếp để highlight đúng element
+        const win3 = doc.defaultView;
+        if (win3 && win3.H5P && win3.H5P.instances) {
+          win3.H5P.instances.forEach(inst => {
+            const lib = inst.libraryInfo?.versionedNameNoSpaces || '';
+            if (!lib.includes('DragText')) return;
+            if (!inst.droppables || !inst.draggables) return;
+
+            // Inject style tag vào doc của H5P
+            const iDoc = inst.droppables[0]?.getElement?.()?.ownerDocument || doc;
+            let st = iDoc.getElementById('_hack_drag_st_');
+            if (!st) {
+              st = iDoc.createElement('style');
+              st.id = '_hack_drag_st_';
+              (iDoc.head || iDoc.body).appendChild(st);
             }
-          });
-          // Highlight từ đúng với đúng màu / mờ từ sai
-          draggables.forEach(el => {
-            const w = normDrag(el);
-            const col = wordColorMap[w];
+            let css = '';
+
             if (isSmartHighlight) {
-              if (col) {
-                el.style.outline='3px solid '+col.bd;
-                el.style.background=col.bg;
-                el.style.color=col.tx;
-                el.style.boxShadow='0 0 14px 5px '+col.glow;
-                el.style.fontWeight='900';
-                el.style.borderRadius='6px';
-                el.style.opacity='1';
-                el.style.filter='none';
-              } else {
-                el.style.outline=''; el.style.background=''; el.style.color='';
-                el.style.boxShadow=''; el.style.fontWeight=''; el.style.borderRadius='';
-                el.style.opacity='0.28'; el.style.filter='grayscale(80%)';
-              }
+              // Highlight dropzones (ô trống)
+              inst.droppables.forEach((drop, i) => {
+                const el = drop.getElement ? drop.getElement() : null;
+                const container = el ? el.closest('.h5p-drag-dropzone-container') || el.parentElement : null;
+                const col = DC[i % DC.length];
+                if (el) {
+                  const cls = '_dz'+i+'_';
+                  el.classList.add(cls);
+                  css += '.'+cls+'{outline:3px solid '+col.bd+' !important;background:'+col.bg+' !important;box-shadow:0 0 14px 5px '+col.glow+' !important;border-radius:6px !important;}';
+                }
+                if (container) {
+                  container.querySelectorAll('._drag_lbl_').forEach(l=>l.remove());
+                  const lbl = iDoc.createElement('span');
+                  lbl.className = '_drag_lbl_';
+                  lbl.style.cssText = 'position:absolute;top:-18px;left:0;font-size:10px;font-weight:900;background:'+col.bd+';color:'+col.tx+';border-radius:3px;padding:0 5px;z-index:9999;pointer-events:none;white-space:nowrap;';
+                  lbl.textContent = 'Ô'+(i+1)+': '+drop.text;
+                  container.style.position = 'relative';
+                  container.appendChild(lbl);
+                }
+              });
+
+              // Build answer set để match draggable
+              const answerList = inst.droppables.map((d,i) => ({text: norm(d.text), idx: i}));
+              const answerColorMap = {};
+              const answerQueue = {};
+              answerList.forEach(({text, idx}) => {
+                if (!answerQueue[text]) answerQueue[text] = [];
+                answerQueue[text].push(DC[idx % DC.length]);
+              });
+              const answerUsed = {};
+              const correctSet = new Set(answerList.map(a=>a.text));
+
+              inst.draggables.forEach(drag => {
+                const el = drag.getElement ? drag.getElement() : null;
+                if (!el) return;
+                const w = norm(drag.getAnswerText ? drag.getAnswerText() : '');
+                const isCorrect = correctSet.has(w);
+                // Remove old classes
+                el.className = el.className.replace(/_dr[a-z0-9]+/g, '').trim();
+                if (isCorrect) {
+                  const queue = answerQueue[w] || [];
+                  const used = answerUsed[w] || 0;
+                  const col = queue[used % queue.length];
+                  answerUsed[w] = used + 1;
+                  if (col) {
+                    const cls = '_dr'+Math.random().toString(36).slice(2,7);
+                    el.classList.add(cls);
+                    css += '.'+cls+'{outline:3px solid '+col.bd+' !important;background:'+col.bg+' !important;color:'+col.tx+' !important;box-shadow:0 0 14px 5px '+col.glow+' !important;font-weight:900 !important;border-radius:6px !important;opacity:1 !important;filter:none !important;}';
+                  }
+                } else {
+                  el.style.setProperty('opacity','0.22','important');
+                  el.style.setProperty('filter','grayscale(90%)','important');
+                }
+              });
+
             } else {
-              el.style.outline=''; el.style.background=''; el.style.color='';
-              el.style.boxShadow=''; el.style.fontWeight=''; el.style.borderRadius='';
-              el.style.opacity=''; el.style.filter='';
+              // Reset
+              iDoc.querySelectorAll('[class*="_dz"],[class*="_dr"]').forEach(el => {
+                el.className = el.className.replace(/_dz\d+_|_dr[a-z0-9]+/g,'').trim();
+                el.style.removeProperty('opacity');
+                el.style.removeProperty('filter');
+              });
+              iDoc.querySelectorAll('._drag_lbl_').forEach(l=>l.remove());
             }
+
+            if (st) st.textContent = css;
           });
-        });
-      } else {
-        doc.querySelectorAll('input.h5p-text-input').forEach(inp => {
-          inp.style.outline = '';
-          inp.style.background = '';
-        });
-        doc.querySelectorAll('.h5p-drag-dropzone-container .ui-droppable,.ui-draggable').forEach(el => {
-          el.style.outline = '';
-          el.style.background = '';
-          el.style.color = '';
-          el.style.fontWeight = '';
-          el.style.borderRadius = '';
-          el.style.boxShadow = '';
-        });
+        }
         const markQs = allResults.filter(q => q.type === 'mark');
         markQs.forEach(mq => {
-          const applyHL = (sp, on) => {
-            sp.style.background   = on ? '#00ff88' : '';
-            sp.style.outline      = on ? '2px solid #00c86e' : '';
+          // Mỗi từ đúng dùng màu riêng từ DC palette
+          const markDC = [
+            {bg:'#FFD700',bd:'#B8860B',tx:'#333'},{bg:'#FF69B4',bd:'#CC1177',tx:'#fff'},
+            {bg:'#00CED1',bd:'#007788',tx:'#fff'},{bg:'#9370DB',bd:'#5500AA',tx:'#fff'},
+            {bg:'#32CD32',bd:'#116611',tx:'#fff'},{bg:'#FF6347',bd:'#CC2200',tx:'#fff'},
+            {bg:'#1E90FF',bd:'#0055CC',tx:'#fff'},{bg:'#FF8C00',bd:'#CC5500',tx:'#333'},
+            {bg:'#DA70D6',bd:'#993399',tx:'#fff'},{bg:'#3CB371',bd:'#115533',tx:'#fff'},
+            {bg:'#DC143C',bd:'#AA0022',tx:'#fff'},{bg:'#4682B4',bd:'#1144AA',tx:'#fff'},
+          ];
+          const wordColorMap = {};
+          mq.answers.forEach((a, i) => { wordColorMap[a.toLowerCase().trim()] = markDC[i % markDC.length]; });
+          const applyHL = (sp, on, col) => {
+            sp.style.background   = on && col ? col.bg : '';
+            sp.style.outline      = on && col ? '2px solid '+col.bd : '';
             sp.style.borderRadius = on ? '5px' : '';
             sp.style.fontWeight   = on ? '900' : '';
-            sp.style.boxShadow    = on ? '0 0 12px 4px rgba(0,255,136,0.75)' : '';
-            sp.style.color        = on ? '#004a28' : '';
+            sp.style.boxShadow    = on && col ? '0 0 10px 3px '+col.bd+'99' : '';
+            sp.style.color        = on && col ? col.tx : '';
             sp.style.padding      = on ? '0 3px' : '';
           };
           const win3 = doc.defaultView;
@@ -1096,7 +1204,8 @@
               inst.selectableWords.forEach((w, wi) => {
                 const sp = spans[wi];
                 if (!sp) return;
-                applyHL(sp, isSmartHighlight && w.isAnswer());
+                const _w = (sp.innerText||'').toLowerCase().trim();
+              applyHL(sp, isSmartHighlight && w.isAnswer(), wordColorMap[_w]);
               });
               marked = true;
             });
@@ -1106,9 +1215,17 @@
             const spans = Array.from(doc.querySelectorAll('.h5p-word-selectable-words span:not(.hidden-but-read)'));
             spans.forEach(sp => {
               const t = (sp.innerText||'').trim().toLowerCase();
-              applyHL(sp, isSmartHighlight && answerSet.has(t));
+              const _t2 = t.toLowerCase().trim();
+            applyHL(sp, isSmartHighlight && answerSet.has(t), wordColorMap[_t2]);
             });
           }
+        });
+        const iDoc2 = doc.querySelector('.h5p-drag-dropzone-container')?.ownerDocument || doc;
+        const st = iDoc2.getElementById('_hack_drag_style_');
+        if (st) { st.textContent = ''; }
+        iDoc2.querySelectorAll('[class*="_dz_hl_"],[class*="_drag_hl_"]').forEach(el => {
+          el.className = el.className.replace(/_dz_hl_\d+_|_drag_hl_[a-z0-9]+/g,'').trim();
+          el.style.opacity=''; el.style.filter='';
         });
         doc.querySelectorAll('._drag_lbl_').forEach(el => el.remove());
         doc.querySelectorAll('.ui-droppable').forEach(el => {
@@ -1173,7 +1290,35 @@
 
   
   document.getElementById('runBtn').onclick = () => {
+    // Single choice
     queryAll('.h5p-sc-alternative.h5p-sc-is-correct').forEach(el => forceSelectElement(el));
+    // DragText: auto kéo thả
+    getIframeDocs().forEach(doc => {
+      const win = doc.defaultView;
+      if (!win || !win.H5P || !win.H5P.instances) return;
+      win.H5P.instances.forEach(inst => {
+        const lib = inst.libraryInfo?.versionedNameNoSpaces || '';
+        if (!lib.includes('DragText')) return;
+        if (!inst.droppables || !inst.draggables) return;
+        // Reset trước
+        try { inst.resetTask && inst.resetTask(); } catch(e) {}
+        // Kéo từng draggable vào đúng dropzone theo text match
+        setTimeout(() => {
+          inst.droppables.forEach(drop => {
+            const correctText = drop.text;
+            const drag = inst.draggables.find(d => (d.getAnswerText ? d.getAnswerText() : d.text) === correctText && !d.isInsideDropZone());
+            if (drag && !drop.hasDraggable()) {
+              try { inst.drop(drag, drop); } catch(e) {}
+            }
+          });
+          // Bấm Kiểm tra nếu có
+          setTimeout(() => {
+            const checkBtn = doc.querySelector('.h5p-joubelui-button.h5p-question-check-answer, button.h5p-joubelui-button');
+            if (checkBtn) checkBtn.click();
+          }, 300);
+        }, 200);
+      });
+    });
   };
   document.getElementById('highlightBtn').onclick = function() {
     isHighlightActive = !isHighlightActive;
