@@ -1093,7 +1093,8 @@
             if (!inst.droppables || !inst.draggables) return;
 
             // Inject style tag vào doc của H5P
-            const iDoc = inst.droppables[0]?.getElement?.()?.ownerDocument || doc;
+            const _el0 = inst.draggables[0]?.getElement?.() || inst.droppables[0]?.getElement?.();
+            const iDoc = _el0?.ownerDocument || doc;
             let st = iDoc.getElementById('_hack_drag_st_');
             if (!st) {
               st = iDoc.createElement('style');
@@ -1104,68 +1105,44 @@
 
             if (isSmartHighlight) {
               // Highlight dropzones (ô trống)
+              // Hiện nhãn Ô1, Ô2... trên chip từ kéo (draggable)
+              // Build map: normText -> số thứ tự ô (có thể nhiều ô cùng từ)
+              const wordSlotMap = {};
               inst.droppables.forEach((drop, i) => {
-                const el = drop.getElement ? drop.getElement() : null;
-                const container = el ? el.closest('.h5p-drag-dropzone-container') || el.parentElement : null;
-                const col = DC[i % DC.length];
-                if (el) {
-                  const cls = '_dz'+i+'_';
-                  el.classList.add(cls);
-                  css += '.'+cls+'{outline:3px solid '+col.bd+' !important;background:'+col.bg+' !important;box-shadow:0 0 14px 5px '+col.glow+' !important;border-radius:6px !important;}';
-                }
-                if (container) {
-                  container.querySelectorAll('._drag_lbl_').forEach(l=>l.remove());
-                  const lbl = iDoc.createElement('span');
-                  lbl.className = '_drag_lbl_';
-                  lbl.style.cssText = 'position:absolute;top:-18px;left:0;font-size:10px;font-weight:900;background:'+col.bd+';color:'+col.tx+';border-radius:3px;padding:0 5px;z-index:9999;pointer-events:none;white-space:nowrap;';
-                  lbl.textContent = 'Ô'+(i+1)+': '+drop.text;
-                  container.style.position = 'relative';
-                  container.appendChild(lbl);
-                }
+                const k = norm(drop.text);
+                if (!wordSlotMap[k]) wordSlotMap[k] = [];
+                wordSlotMap[k].push(i+1);
               });
+              const wordSlotUsed = {};
 
-              // Build answer set để match draggable
-              const answerList = inst.droppables.map((d,i) => ({text: norm(d.text), idx: i}));
-              const answerColorMap = {};
-              const answerQueue = {};
-              answerList.forEach(({text, idx}) => {
-                if (!answerQueue[text]) answerQueue[text] = [];
-                answerQueue[text].push(DC[idx % DC.length]);
-              });
-              const answerUsed = {};
-              const correctSet = new Set(answerList.map(a=>a.text));
+              // Xóa nhãn cũ trên draggables
+              iDoc.querySelectorAll('._drag_lbl_').forEach(l=>l.remove());
 
               inst.draggables.forEach(drag => {
                 const el = drag.getElement ? drag.getElement() : null;
                 if (!el) return;
                 const w = norm(drag.getAnswerText ? drag.getAnswerText() : '');
-                const isCorrect = correctSet.has(w);
-                // Remove old classes
-                el.className = el.className.replace(/_dr[a-z0-9]+/g, '').trim();
-                if (isCorrect) {
-                  const queue = answerQueue[w] || [];
-                  const used = answerUsed[w] || 0;
-                  const col = queue[used % queue.length];
-                  answerUsed[w] = used + 1;
-                  if (col) {
-                    const cls = '_dr'+Math.random().toString(36).slice(2,7);
-                    el.classList.add(cls);
-                    css += '.'+cls+'{outline:3px solid '+col.bd+' !important;background:'+col.bg+' !important;color:'+col.tx+' !important;box-shadow:0 0 14px 5px '+col.glow+' !important;font-weight:900 !important;border-radius:6px !important;opacity:1 !important;filter:none !important;}';
-                  }
-                } else {
-                  el.style.setProperty('opacity','0.22','important');
-                  el.style.setProperty('filter','grayscale(90%)','important');
+                const slots = wordSlotMap[w];
+                // Đánh dấu là đã xử lý để reset sau
+                el.setAttribute('data-orig-html', el.innerHTML);
+                if (!slots) return; // từ nhiễu - giữ nguyên
+                const usedIdx = wordSlotUsed[w] || 0;
+                const slotNum = slots[usedIdx % slots.length];
+                wordSlotUsed[w] = usedIdx + 1;
+                // Thêm nhãn Ô vào text của chip - đơn giản nhất
+                const textSpan = el.querySelector('span:not(.h5p-hidden-read)');
+                if (textSpan) {
+                  textSpan.innerHTML = '<b style="font-size:9px;color:#e74c3c;margin-right:2px;">Ô'+slotNum+'</b>' + textSpan.innerHTML;
                 }
               });
 
             } else {
               // Reset
-              iDoc.querySelectorAll('[class*="_dz"],[class*="_dr"]').forEach(el => {
-                el.className = el.className.replace(/_dz\d+_|_dr[a-z0-9]+/g,'').trim();
-                el.style.removeProperty('opacity');
-                el.style.removeProperty('filter');
+              // Restore HTML chip về ban đầu
+              iDoc.querySelectorAll('[data-orig-html]').forEach(el => {
+                el.innerHTML = el.getAttribute('data-orig-html');
+                el.removeAttribute('data-orig-html');
               });
-              iDoc.querySelectorAll('._drag_lbl_').forEach(l=>l.remove());
             }
 
             if (st) st.textContent = css;
@@ -1173,25 +1150,15 @@
         }
         const markQs = allResults.filter(q => q.type === 'mark');
         markQs.forEach(mq => {
-          // Mỗi từ đúng dùng màu riêng từ DC palette
-          const markDC = [
-            {bg:'#FFD700',bd:'#B8860B',tx:'#333'},{bg:'#FF69B4',bd:'#CC1177',tx:'#fff'},
-            {bg:'#00CED1',bd:'#007788',tx:'#fff'},{bg:'#9370DB',bd:'#5500AA',tx:'#fff'},
-            {bg:'#32CD32',bd:'#116611',tx:'#fff'},{bg:'#FF6347',bd:'#CC2200',tx:'#fff'},
-            {bg:'#1E90FF',bd:'#0055CC',tx:'#fff'},{bg:'#FF8C00',bd:'#CC5500',tx:'#333'},
-            {bg:'#DA70D6',bd:'#993399',tx:'#fff'},{bg:'#3CB371',bd:'#115533',tx:'#fff'},
-            {bg:'#DC143C',bd:'#AA0022',tx:'#fff'},{bg:'#4682B4',bd:'#1144AA',tx:'#fff'},
-          ];
           const wordColorMap = {};
-          mq.answers.forEach((a, i) => { wordColorMap[a.toLowerCase().trim()] = markDC[i % markDC.length]; });
           const applyHL = (sp, on, col) => {
-            sp.style.background   = on && col ? col.bg : '';
-            sp.style.outline      = on && col ? '2px solid '+col.bd : '';
-            sp.style.borderRadius = on ? '5px' : '';
+            sp.style.background   = '';
+            sp.style.outline      = '';
+            sp.style.borderRadius = '';
             sp.style.fontWeight   = on ? '900' : '';
-            sp.style.boxShadow    = on && col ? '0 0 10px 3px '+col.bd+'99' : '';
-            sp.style.color        = on && col ? col.tx : '';
-            sp.style.padding      = on ? '0 3px' : '';
+            sp.style.boxShadow    = '';
+            sp.style.color        = '';
+            sp.style.padding      = '';
           };
           const win3 = doc.defaultView;
           let marked = false;
