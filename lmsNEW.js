@@ -868,6 +868,7 @@
         <div style="position:absolute;bottom:6px;left:0;display:flex;gap:6px;padding:0 4px;">
           <button id="selectAnsBtn" title="Xem chi tiết" style="width:32px;height:32px;border:none;border-radius:8px;background:#e74c3c;color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.2s;">👁️</button>
           <button id="copyAnsBtn" title="Copy đáp án" style="width:32px;height:32px;border:none;border-radius:8px;background:#e74c3c;color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.2s;">📋</button>
+          <button id="autoDragBtn" title="Tự động kéo thả" style="width:32px;height:32px;border:none;border-radius:8px;background:#e74c3c;color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.2s;">💫</button>
         </div>
       </div>
       <div id="tabAI" class="tab-content">
@@ -942,6 +943,25 @@
   };
 
   document.getElementById('setupBtn').onclick = () => hackLmsDirect();
+
+  document.getElementById('autoDragBtn').onclick = () => {
+    getIframeDocs().forEach(doc => {
+      const win = doc.defaultView;
+      if (!win || !win.H5P || !win.H5P.instances) return;
+      win.H5P.instances.forEach(inst => {
+        const lib = inst.libraryInfo?.versionedNameNoSpaces || '';
+        if (!lib.includes('DragText')) return;
+        if (!inst.droppables || !inst.draggables) return;
+        try { inst.resetTask(); } catch(e) {}
+        setTimeout(() => {
+          inst.droppables.forEach(drop => {
+            const drag = inst.draggables.find(d => !d.isInsideDropZone() && d.text === drop.text);
+            if (drag) try { inst.drop(drag, drop); } catch(e) {}
+          });
+        }, 300);
+      });
+    });
+  };
 
   document.getElementById('copyAnsBtn').onclick = function() {
     if (!allResults.length) return alert('Vui lòng Setup trước!');
@@ -1259,33 +1279,7 @@
   document.getElementById('runBtn').onclick = () => {
     // Single choice
     queryAll('.h5p-sc-alternative.h5p-sc-is-correct').forEach(el => forceSelectElement(el));
-    // DragText: auto kéo thả
-    getIframeDocs().forEach(doc => {
-      const win = doc.defaultView;
-      if (!win || !win.H5P || !win.H5P.instances) return;
-      win.H5P.instances.forEach(inst => {
-        const lib = inst.libraryInfo?.versionedNameNoSpaces || '';
-        if (!lib.includes('DragText')) return;
-        if (!inst.droppables || !inst.draggables) return;
-        // Reset trước
-        try { inst.resetTask && inst.resetTask(); } catch(e) {}
-        // Kéo từng draggable vào đúng dropzone theo text match
-        setTimeout(() => {
-          inst.droppables.forEach(drop => {
-            const correctText = drop.text;
-            const drag = inst.draggables.find(d => (d.getAnswerText ? d.getAnswerText() : d.text) === correctText && !d.isInsideDropZone());
-            if (drag && !drop.hasDraggable()) {
-              try { inst.drop(drag, drop); } catch(e) {}
-            }
-          });
-          // Bấm Kiểm tra nếu có
-          setTimeout(() => {
-            const checkBtn = doc.querySelector('.h5p-joubelui-button.h5p-question-check-answer, button.h5p-joubelui-button');
-            if (checkBtn) checkBtn.click();
-          }, 300);
-        }, 200);
-      });
-    });
+
   };
   document.getElementById('highlightBtn').onclick = function() {
     isHighlightActive = !isHighlightActive;
