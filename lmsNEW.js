@@ -523,6 +523,25 @@
       } catch(e) {}
     } catch(e) { console.log("Doc err:", e.message); } });
 
+    // Detect essay/text editor (dạng tự luận)
+    try {
+      const essaySelectors = [
+        '.h5p-essay-xapi-extra-data + div [contenteditable]',
+        '[contenteditable="true"]',
+        '.ck-editor__editable',
+        '.note-editable',
+        'iframe.cke_wysiwyg_frame',
+      ];
+      essaySelectors.forEach(sel => {
+        document.querySelectorAll(sel).forEach(el => {
+          if (el.closest('#draggableUI')) return; // bỏ qua UI của mình
+          const label = el.closest('form,section,.essay,.submission')?.querySelector('h2,h3,label,p')?.innerText?.trim() || 'Tự luận';
+          const already = allResults.some(r => r.type === 'essay');
+          if (!already) allResults.push({type:'essay', qText: label, el});
+        });
+      });
+    } catch(e) {}
+
     const seen = new Set();
     allResults = allResults.filter(r => {
       const key = r.type + '|' + r.qText.substring(0,30);
@@ -592,6 +611,9 @@
           body += '<div style="font-size:11px;color:#bbb;margin-top:2px;">Nhiễu: ' + q.distractors.join(' · ') + '</div>';
         }
       }
+      if (q.type === 'essay') {
+        body += '<div style="color:#3498db;font-size:12px;">📝 Dạng tự luận — bấm <b>Tự điền</b> để A.I viết câu trả lời</div>';
+      }
       const cleanTitle = (q.qText || '').replace(/\*[^*]+\*/g, '___').trim();
       const titlePreview = cleanTitle.length > 60 ? cleanTitle.substring(0, 60) + '...' : cleanTitle;
       const typeBadge = q.type === 'drag' ? '<span style="background:#FF8C00;color:#fff;font-size:9px;font-weight:900;border-radius:3px;padding:1px 5px;margin-left:4px;">KÉO THẢ</span>'
@@ -603,6 +625,23 @@
     });
 
     lmsOutput.innerHTML = html;
+
+    // Tự động điền essay nếu có
+    const essayQs2 = allResults.filter(q => q.type === 'essay');
+    const fillEssay = (el) => {
+      if (!el) return;
+      el.focus();
+      el.innerHTML = '<p>Theo em, việc đọc sách giúp chúng ta mở rộng kiến thức, phát triển tư duy và khám phá những điều mới mẻ. Mỗi cuốn sách là một hành trình thú vị giúp ta "du hành" vào thế giới mới.</p>';
+      el.dispatchEvent(new Event('input', {bubbles:true}));
+      el.dispatchEvent(new Event('change', {bubbles:true}));
+    };
+    if (essayQs2.length) {
+      essayQs2.forEach(q => fillEssay(q.el));
+    } else {
+      document.querySelectorAll('[contenteditable="true"]').forEach(el => {
+        if (!el.closest('#draggableUI')) fillEssay(el);
+      });
+    }
   }
 
   function executeAutoSelect(confirmedQuestions) {
@@ -869,6 +908,7 @@
           <button id="selectAnsBtn" title="Xem chi tiết" style="width:32px;height:32px;border:none;border-radius:8px;background:#e74c3c;color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.2s;">👁️</button>
           <button id="copyAnsBtn" title="Copy đáp án" style="width:32px;height:32px;border:none;border-radius:8px;background:#e74c3c;color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.2s;">📋</button>
           <button id="autoDragBtn" title="Tự động kéo thả" style="width:32px;height:32px;border:none;border-radius:8px;background:#e74c3c;color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.2s;">💫</button>
+          <button id="videoSpeedBtn" title="Tua video x5" style="width:32px;height:32px;border:none;border-radius:8px;background:#e74c3c;color:#fff;font-size:11px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.2s;letter-spacing:-0.5px;">X5</button>
         </div>
       </div>
       <div id="tabAI" class="tab-content">
@@ -944,7 +984,98 @@
 
   document.getElementById('setupBtn').onclick = () => hackLmsDirect();
 
-  document.getElementById('autoDragBtn').onclick = () => {
+  // === VIDEO SPEED ===
+  let videoSpeed = 1;
+  const videoSpeedBtn = document.getElementById('videoSpeedBtn');
+  const SPEEDS = [1, 1.5, 2, 3, 5];
+  const SPEED_LABELS = ['1x', '1.5x', '2x', '3x', 'X5'];
+
+  function getAllVideos() {
+    const vids = [];
+    document.querySelectorAll('video').forEach(v => vids.push(v));
+    document.querySelectorAll('iframe').forEach(f => {
+      try { f.contentDocument.querySelectorAll('video').forEach(v => vids.push(v)); } catch(e) {}
+      try {
+        f.contentDocument.querySelectorAll('iframe').forEach(f2 => {
+          try { f2.contentDocument.querySelectorAll('video').forEach(v => vids.push(v)); } catch(e) {}
+        });
+      } catch(e) {}
+    });
+    return vids;
+  }
+
+  function setYouTubeSpeed(rate) {
+    // Inject script vào about:blank iframe (same-origin) để control YouTube từ bên trong
+    document.querySelectorAll('iframe').forEach(wrapper => {
+      try {
+        const wDoc = wrapper.contentDocument;
+        if (!wDoc) return;
+        const ytFrame = wDoc.querySelector('iframe[src*="youtube"]');
+        if (!ytFrame) return;
+
+        // Đã có script inject rồi thì chỉ gửi rate
+        if (wDoc._ytPlayer) {
+          try { wDoc._ytPlayer.setPlaybackRate(rate); } catch(e) {}
+          return;
+        }
+
+        // Reload ytFrame với enablejsapi=1
+        const src = ytFrame.src;
+        if (!src.includes('enablejsapi')) {
+          ytFrame.src = src + (src.includes('?') ? '&' : '?') + 'enablejsapi=1';
+        }
+
+        // Inject YT IFrame API vào wrapper doc
+        const script = wDoc.createElement('script');
+        script.src = 'https://www.youtube.com/iframe_api';
+        wDoc.head.appendChild(script);
+
+        // Callback khi API sẵn sàng
+        wDoc.defaultView.onYouTubeIframeAPIReady = function() {
+          wDoc._ytPlayer = new wDoc.defaultView.YT.Player(ytFrame, {
+            events: {
+              onReady: function(e) {
+                e.target.setPlaybackRate(rate);
+                wDoc._ytPlayer = e.target;
+              }
+            }
+          });
+        };
+
+        // Fallback: nếu API đã load trước đó
+        setTimeout(() => {
+          try {
+            if (wDoc.defaultView.YT && wDoc.defaultView.YT.Player && !wDoc._ytPlayer) {
+              wDoc.defaultView.onYouTubeIframeAPIReady();
+            }
+            if (wDoc._ytPlayer) wDoc._ytPlayer.setPlaybackRate(rate);
+          } catch(e) {}
+        }, 2000);
+
+      } catch(e) {}
+    });
+  }
+
+
+
+
+
+  let _speedIdx = 0;
+  videoSpeedBtn.onclick = () => {
+    _speedIdx = (_speedIdx + 1) % SPEEDS.length;
+    const nextSpeed = SPEEDS[_speedIdx];
+    // HTML5 video
+    getAllVideos().forEach(v => { v.playbackRate = nextSpeed; v.defaultPlaybackRate = nextSpeed; });
+    // YouTube iframe
+    setYouTubeSpeed(nextSpeed);
+    videoSpeedBtn.textContent = SPEED_LABELS[_speedIdx];
+    videoSpeedBtn.style.background = nextSpeed >= 5 ? '#8e44ad' :
+                                     nextSpeed >= 3 ? '#c0392b' :
+                                     nextSpeed >= 2 ? '#e67e22' : '#e74c3c';
+  };
+  // === END VIDEO SPEED ===
+
+    document.getElementById('autoDragBtn').onclick = () => {
     getIframeDocs().forEach(doc => {
       const win = doc.defaultView;
       if (!win || !win.H5P || !win.H5P.instances) return;
@@ -1316,4 +1447,4 @@
   };
 })();
 console.clear();
-console.log("Loaded👍");
+console.log("Loaded");
